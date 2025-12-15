@@ -1,6 +1,6 @@
 services:
   wg-forwarder:
-    image: lahiru98s/portbridge:latest
+    build: .  
     container_name: wg-forwarder
     environment:
       - WG_HOST=202.124.164.163
