@@ -128,18 +128,18 @@ Check the Web UI. The client status should turn **Online** (Green) within a few 
 Now that your client is connected, let's expose a service (e.g., a Minecraft server or Web App) running on your home machine.
 
 1.  **Identify the Service**:
-    *   Let's say your Home Server runs a web app on port `80`.
+    *   Let's say your Home Server runs a web app on port `8080`.
 2.  **Open a Port**:
     *   Go to the **Forwarding** tab in the Web UI.
     *   Click **"New Rule"**.
-    *   **Public Port**: `20000` (or a range `8000-8100`).
-    *   **Internal Port**: `80` (The port your service is running on).
+    *   **Public Port**: `30000` (or a range `30000-30100`).
+    *   **Internal Port**: `8080` (The port your service is running on).
     *   **Protocol**: `TCP` (or UDP/Both depending on the service).
     *   **Target Client**: Select `Home-Server`.
     *   **Source IP (Optional)**: Enter an IP `1.2.3.4` to only allow connections from that IP.
     *   Click **Add Rule**.
 3.  **Access**:
-    *   Anyone can now access your home web app via `http://<VPS-Public-IP>:20000`.
+    *   Anyone can now access your home web app via `http://<VPS-Public-IP>:30000`.
 
 ---
 

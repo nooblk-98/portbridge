@@ -353,7 +353,7 @@ def load_forwardings(default_client_ip=None):
 
     # If no persisted rules, seed a single TCP+UDP forward for port 20000 to the default client.
     if default_client_ip:
-        seed = [{"port": 20000, "protocol": "both", "client_ip": str(default_client_ip)}]
+        seed = [{"port": 30000, "protocol": "both", "client_ip": str(default_client_ip), "target_port": 8080}]
         save_json(FORWARD_FILE, seed)
         return seed
 

@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   wg-forwarder:
-    image: ghcr.io/nooblk-98/portbridge:latest
+    image: lahiru98s/portbridge:latest
     container_name: portbridge
 
     environment:

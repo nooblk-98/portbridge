@@ -87,13 +87,13 @@ docker-compose up -d
 
 ## 🔗 Port Forwarding (The Magic)
 
-Let's expose a service (e.g., a Web App on port 80) running on your home machine.
+Let's expose a service (e.g., a Web App on port 8080) running on your home machine.
 
 1.  **Open a Port** in the **Forwarding** tab.
-    *   **Public Port**: `20000`
-    *   **Internal Port**: `80`
+    *   **Public Port**: `30000`
+    *   **Internal Port**: `8080`
     *   **Target Client**: Select `Home-Server`
-2.  **Access**: `http://<VPS-Public-IP>:20000` -> now routes to your Home Server's port 80!
+2.  **Access**: `http://<VPS-Public-IP>:30000` -> now routes to your Home Server's port 8080!
 
 ---
 
