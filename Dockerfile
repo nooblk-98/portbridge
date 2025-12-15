@@ -14,10 +14,11 @@ COPY requirements.txt /tmp/requirements.txt
 RUN python3 -m pip install --no-cache-dir --break-system-packages -r /tmp/requirements.txt
 
 WORKDIR /app
-COPY app /app
+COPY app /app/app
 COPY config /app/config
+COPY run.py /app/run.py
 
 ENV PYTHONUNBUFFERED=1
 EXPOSE 51820/udp
 
-CMD ["python3", "/app/server.py"]
+CMD ["python3", "run.py"]

@@ -1,0 +1,78 @@
+<!-- Forwarding View -->
+<div x-show="currentTab === 'forwarding'" x-cloak x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+    <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-3xl font-heading font-bold text-slate-900 dark:text-white">Port Forwarding
+            </h2>
+            <p class="text-slate-500 dark:text-slate-400 mt-1">Manage traffic rules</p>
+        </div>
+        <button @click="openFwdModal()"
+            class="btn-primary flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-medium shadow-lg shadow-primary-500/30 transition-all active:scale-95">
+            <span class="material-symbols-rounded">add_link</span>
+            New Rule
+        </button>
+    </header>
+
+    <div
+        class="bg-white dark:bg-dark-surface rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-dark-border">
+                        <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                            Protocol</th>
+                        <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                            Public Port</th>
+                        <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                            Internal Port</th>
+                        <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                            Target Client</th>
+                        <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">
+                            Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-dark-border">
+                    <template x-for="rule in forwardings" :key="rule.port + rule.protocol">
+                        <tr class="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
+                            <td class="px-6 py-4">
+                                <span
+                                    class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold uppercase"
+                                    :class="{
+                                                          'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300': rule.protocol === 'tcp',
+                                                          'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300': rule.protocol === 'udp',
+                                                          'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300': rule.protocol === 'both'
+                                                      }" x-text="rule.protocol">
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 font-mono text-sm font-medium text-slate-700 dark:text-slate-300"
+                                x-text="rule.port"></td>
+                            <td class="px-6 py-4 font-mono text-sm text-slate-600 dark:text-slate-400"
+                                x-text="rule.target_port || rule.port"></td>
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-2">
+                                    <span class="material-symbols-rounded text-slate-400 text-lg">computer</span>
+                                    <span class="text-sm font-medium text-slate-700 dark:text-slate-300"
+                                        x-text="getClientName(rule.client_ip)"></span>
+                                    <span class="text-xs text-slate-400 font-mono"
+                                        x-text="'(' + rule.client_ip + ')'"></span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <button @click="deleteForwarding(rule.port, rule.protocol)"
+                                    class="text-slate-400 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
+                                    <span class="material-symbols-rounded">delete</span>
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="forwardings.length === 0">
+                        <td colspan="5" class="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
+                            No forwarding rules defined yet.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
