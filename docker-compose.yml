@@ -1,0 +1,36 @@
+services:
+  wg-forwarder:
+    build:
+      context: .
+    image: ${IMAGE:-ghcr.io/nooblk-98/wg-forwarder:latest}
+    container_name: wg-forwarder
+    environment:
+      - WG_HOST=202.124.164.163
+      - WG_PORT=51820
+      - WG_NETWORK=10.8.0.0/24
+      - WG_ADDRESS=10.8.0.1/24
+      - APP_PORT=3000
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    ports:
+      - "51820:51820/udp"
+      - "3000:3000/tcp"
+      - "20000-40000:20000-40000/tcp"
+    volumes:
+      - wg-data:/data
+      - /lib/modules:/lib/modules:ro
+    networks:
+      - wg-network
+    restart: unless-stopped
+
+networks:
+  wg-network:
+    driver: bridge
+
+volumes:
+  wg-data:
+    driver: local
