@@ -146,388 +146,384 @@
                 </template>
             </nav>
 
-            <div class="p-4 border-t border-gray-200 dark:border-dark-border">
-                <div
-                    class="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-gray-100 dark:border-dark-border">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">System Status</span>
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    </div>
-                    <div class="text-sm font-mono text-slate-600 dark:text-slate-400 truncate"
-                        x-text="state.endpoint || 'Connecting...'"></div>
-                </div>
-                <button @click="toggleTheme()"
-                    class="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-200 dark:border-dark-border text-slate-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-sm font-medium">
-                    <span class="material-symbols-rounded text-lg"
-                        x-text="isDarkMode ? 'light_mode' : 'dark_mode'"></span>
-                    <span x-text="isDarkMode ? 'Light Mode' : 'Dark Mode'"></span>
-                </button>
-            </div>
-        </aside>
-
-        <!-- Mobile Header -->
-        <div
-            class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border z-30 flex items-center justify-between px-4">
-            <div class="flex items-center gap-2">
-                <div
-                    class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-indigo-600 flex items-center justify-center text-white">
-                    <span class="material-symbols-rounded text-lg">vpn_lock</span>
-                </div>
-                <span class="font-heading font-bold text-lg text-slate-900 dark:text-white">Port bridge</span>
-            </div>
-            <button @click="mobileMenuOpen = !mobileMenuOpen"
-                class="p-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800">
-                <span class="material-symbols-rounded text-2xl">menu</span>
+            <button @click="logout()"
+                class="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm font-medium">
+                <span class="material-symbols-rounded text-lg">logout</span>
+                <span>Sign Out</span>
             </button>
-        </div>
+    </div>
+    <div class="p-4 border-t border-gray-200 dark:border-dark-border text-center">
+        <button @click="toggleTheme()"
+            class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-200 dark:border-dark-border text-slate-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-sm font-medium">
+            <span class="material-symbols-rounded text-lg" x-text="isDarkMode ? 'light_mode' : 'dark_mode'"></span>
+            <span x-text="isDarkMode ? 'Light Mode' : 'Dark Mode'"></span>
+        </button>
+    </div>
+    </aside>
 
-        <!-- Mobile Menu Overlay -->
-        <div x-show="mobileMenuOpen" x-transition.opacity class="fixed inset-0 bg-black/50 z-40 md:hidden"
-            @click="mobileMenuOpen = false"></div>
-
-        <!-- Mobile Menu Sidebar -->
-        <div x-show="mobileMenuOpen" x-transition:enter="transition ease-out duration-300"
-            x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0"
-            x-transition:leave="transition ease-in duration-300" x-transition:leave-start="translate-x-0"
-            x-transition:leave-end="-translate-x-full"
-            class="fixed inset-y-0 left-0 w-64 bg-white dark:bg-dark-surface z-50 md:hidden flex flex-col shadow-2xl">
-            <!-- Same content as sidebar, simplified -->
-            <div class="p-6 border-b border-gray-200 dark:border-dark-border">
-                <h2 class="font-heading font-bold text-xl text-slate-900 dark:text-white">Menu</h2>
+    <!-- Mobile Header -->
+    <div
+        class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border z-30 flex items-center justify-between px-4">
+        <div class="flex items-center gap-2">
+            <div
+                class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-indigo-600 flex items-center justify-center text-white">
+                <span class="material-symbols-rounded text-lg">vpn_lock</span>
             </div>
-            <nav class="flex-1 p-4 space-y-2">
-                <template x-for="item in navItems" :key="item.id">
-                    <button @click="currentTab = item.id; mobileMenuOpen = false"
-                        class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200"
-                        :class="currentTab === item.id ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'">
-                        <span class="material-symbols-rounded text-2xl" x-text="item.icon"></span>
-                        <span x-text="item.label"></span>
+            <span class="font-heading font-bold text-lg text-slate-900 dark:text-white">Port bridge</span>
+        </div>
+        <button @click="mobileMenuOpen = !mobileMenuOpen"
+            class="p-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800">
+            <span class="material-symbols-rounded text-2xl">menu</span>
+        </button>
+    </div>
+
+    <!-- Mobile Menu Overlay -->
+    <div x-show="mobileMenuOpen" x-transition.opacity class="fixed inset-0 bg-black/50 z-40 md:hidden"
+        @click="mobileMenuOpen = false"></div>
+
+    <!-- Mobile Menu Sidebar -->
+    <div x-show="mobileMenuOpen" x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0"
+        x-transition:leave="transition ease-in duration-300" x-transition:leave-start="translate-x-0"
+        x-transition:leave-end="-translate-x-full"
+        class="fixed inset-y-0 left-0 w-64 bg-white dark:bg-dark-surface z-50 md:hidden flex flex-col shadow-2xl">
+        <!-- Same content as sidebar, simplified -->
+        <div class="p-6 border-b border-gray-200 dark:border-dark-border">
+            <h2 class="font-heading font-bold text-xl text-slate-900 dark:text-white">Menu</h2>
+        </div>
+        <nav class="flex-1 p-4 space-y-2">
+            <template x-for="item in navItems" :key="item.id">
+                <button @click="currentTab = item.id; mobileMenuOpen = false"
+                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200"
+                    :class="currentTab === item.id ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'">
+                    <span class="material-symbols-rounded text-2xl" x-text="item.icon"></span>
+                    <span x-text="item.label"></span>
+                </button>
+            </template>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <main
+        class="flex-1 overflow-y-auto bg-gray-50 dark:bg-dark-bg transition-colors duration-300 pt-16 md:pt-0 relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+            <!-- Dashboard View -->
+            <div x-show="currentTab === 'dashboard'" x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+                <header class="mb-8">
+                    <h2 class="text-3xl font-heading font-bold text-slate-900 dark:text-white">Dashboard</h2>
+                    <p class="text-slate-500 dark:text-slate-400 mt-1">Overview of your network status</p>
+                </header>
+
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <!-- Clients Card -->
+                    <div
+                        class="bg-white dark:bg-dark-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <span class="material-symbols-rounded text-6xl text-primary-500">group</span>
+                        </div>
+                        <div class="relative z-10">
+                            <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Clients</p>
+                            <h3 class="text-3xl font-bold text-slate-900 dark:text-white mt-1"
+                                x-text="state.clients || 0">0</h3>
+                            <div
+                                class="mt-4 flex items-center text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+                                <span class="material-symbols-rounded text-lg mr-1">check_circle</span>
+                                <span>Active Network</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Forwardings Card -->
+                    <div
+                        class="bg-white dark:bg-dark-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <span class="material-symbols-rounded text-6xl text-orange-500">alt_route</span>
+                        </div>
+                        <div class="relative z-10">
+                            <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Active Ports</p>
+                            <h3 class="text-3xl font-bold text-slate-900 dark:text-white mt-1"
+                                x-text="state.forwardings || 0">0</h3>
+                            <div
+                                class="mt-4 flex items-center text-sm text-orange-600 dark:text-orange-400 font-medium">
+                                <span class="material-symbols-rounded text-lg mr-1">arrow_forward</span>
+                                <span>Port Rules</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Network Card -->
+                    <div
+                        class="bg-white dark:bg-dark-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border relative overflow-hidden group col-span-1 md:col-span-2">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <span class="material-symbols-rounded text-6xl text-indigo-500">hub</span>
+                        </div>
+                        <div class="relative z-10">
+                            <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Network Configuration
+                            </p>
+                            <div class="mt-2 space-y-2">
+                                <div
+                                    class="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-800/50 rounded-lg">
+                                    <span class="text-xs font-bold text-slate-500 uppercase">Interface</span>
+                                    <span class="font-mono text-sm font-semibold text-slate-700 dark:text-slate-300"
+                                        x-text="state.interface">wg0</span>
+                                </div>
+                                <div
+                                    class="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-800/50 rounded-lg">
+                                    <span class="text-xs font-bold text-slate-500 uppercase">Subnet</span>
+                                    <span class="font-mono text-sm font-semibold text-slate-700 dark:text-slate-300"
+                                        x-text="state.network">10.8.0.0/24</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <button @click="openClientModal()"
+                        class="group p-6 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl shadow-lg shadow-primary-500/20 text-white text-left hover:shadow-xl hover:shadow-primary-500/30 transition-all duration-300 transform hover:-translate-y-1">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                                <span class="material-symbols-rounded text-2xl">person_add</span>
+                            </span>
+                            <span
+                                class="material-symbols-rounded text-2xl opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1">arrow_forward</span>
+                        </div>
+                        <h3 class="text-xl font-bold">Add New Client</h3>
+                        <p class="text-primary-100 mt-1 text-sm">Create a new peer configuration</p>
                     </button>
+
+                    <button @click="openFwdModal()"
+                        class="group p-6 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl shadow-sm text-left hover:border-primary-500 dark:hover:border-primary-500 transition-all duration-300 transform hover:-translate-y-1">
+                        <div class="flex items-center justify-between mb-4">
+                            <span
+                                class="p-3 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-xl">
+                                <span class="material-symbols-rounded text-2xl">add_link</span>
+                            </span>
+                            <span
+                                class="material-symbols-rounded text-2xl text-slate-400 group-hover:text-primary-500 transition-colors">arrow_forward</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-900 dark:text-white">Open Port</h3>
+                        <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Forward traffic to a client</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Clients View -->
+            <div x-show="currentTab === 'clients'" x-cloak x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+                <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-3xl font-heading font-bold text-slate-900 dark:text-white">Clients</h2>
+                        <p class="text-slate-500 dark:text-slate-400 mt-1">Manage connected peers</p>
+                    </div>
+                    <button @click="openClientModal()"
+                        class="btn-primary flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-medium shadow-lg shadow-primary-500/30 transition-all active:scale-95">
+                        <span class="material-symbols-rounded">add</span>
+                        New Client
+                    </button>
+                </header>
+
+                <!-- Search -->
+                <div class="mb-6">
+                    <div class="relative max-w-md">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="material-symbols-rounded text-slate-400">search</span>
+                        </span>
+                        <input type="text" x-model="searchClient" placeholder="Search clients..."
+                            class="w-full pl-10 pr-4 py-2.5 rounded-xl border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow">
+                    </div>
+                </div>
+
+                <!-- Clients Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    <template x-for="client in filteredClients" :key="client.public_key">
+                        <div
+                            class="bg-white dark:bg-dark-surface rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-dark-border hover:shadow-md transition-shadow group">
+                            <div class="flex items-start justify-between mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold uppercase"
+                                        :class="client.online ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'">
+                                        <span x-text="client.name.substring(0, 2)"></span>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-slate-900 dark:text-white" x-text="client.name">
+                                        </h3>
+                                        <div class="flex items-center gap-1.5 mt-0.5">
+                                            <span class="w-2 h-2 rounded-full"
+                                                :class="client.online ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'"></span>
+                                            <span class="text-xs font-medium text-slate-500 dark:text-slate-400"
+                                                x-text="client.online ? 'Online' : 'Offline'"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="relative" x-data="{ open: false }">
+                                    <button @click="open = !open" @click.away="open = false"
+                                        class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
+                                        <span class="material-symbols-rounded">more_vert</span>
+                                    </button>
+                                    <div x-show="open"
+                                        class="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-surface rounded-xl shadow-xl border border-gray-100 dark:border-dark-border py-1 z-10"
+                                        x-cloak>
+                                        <a :href="client.config"
+                                            class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Download
+                                            Config</a>
+                                        <button @click="showQR(client)"
+                                            class="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Show
+                                            QR Code</button>
+                                        <div class="h-px bg-gray-100 dark:bg-dark-border my-1"></div>
+                                        <button @click="deleteClient(client.name)"
+                                            class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">Delete
+                                            Client</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="text-slate-500 dark:text-slate-400">IP Address</span>
+                                    <span class="font-mono font-medium text-slate-700 dark:text-slate-300"
+                                        x-text="client.address"></span>
+                                </div>
+                                <span class="font-medium text-slate-700 dark:text-slate-300"
+                                    x-text="formatTime(client.last_handshake)"></span>
+                            </div>
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-slate-500 dark:text-slate-400">Data Usage</span>
+                                <div class="flex items-center gap-2 font-mono text-xs">
+                                    <span class="text-slate-600 dark:text-slate-400 flex items-center" title="Upload">
+                                        <span class="material-symbols-rounded text-sm mr-0.5">arrow_upward</span>
+                                        <span x-text="formatBytes(client.tx_bytes)"></span>
+                                    </span>
+                                    <span class="text-slate-600 dark:text-slate-400 flex items-center" title="Download">
+                                        <span class="material-symbols-rounded text-sm mr-0.5">arrow_downward</span>
+                                        <span x-text="formatBytes(client.rx_bytes)"></span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-5 pt-4 border-t border-gray-100 dark:border-dark-border">
+                            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                                Active Forwards</div>
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="fwd in client.forwardings" :key="fwd.port + fwd.protocol">
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800">
+                                        <span x-text="fwd.port"></span>
+                                        <span class="mx-1">→</span>
+                                        <span x-text="fwd.target_port || fwd.port"></span>
+                                        <span class="ml-1 opacity-75"
+                                            x-text="'(' + fwd.protocol.toUpperCase() + ')'"></span>
+                                    </span>
+                                </template>
+                                <span x-show="!client.forwardings || client.forwardings.length === 0"
+                                    class="text-xs text-slate-400 italic">No active rules</span>
+                            </div>
+                        </div>
+                </div>
                 </template>
-            </nav>
+
+                <!-- Empty State -->
+                <div x-show="filteredClients.length === 0" class="col-span-full py-12 text-center">
+                    <div
+                        class="w-16 h-16 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="material-symbols-rounded text-3xl text-slate-400">search_off</span>
+                    </div>
+                    <h3 class="text-lg font-medium text-slate-900 dark:text-white">No clients found</h3>
+                    <p class="text-slate-500 dark:text-slate-400">Try adjusting your search or add a new client.
+                    </p>
+                </div>
+            </div>
         </div>
 
-        <!-- Main Content -->
-        <main
-            class="flex-1 overflow-y-auto bg-gray-50 dark:bg-dark-bg transition-colors duration-300 pt-16 md:pt-0 relative">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-                <!-- Dashboard View -->
-                <div x-show="currentTab === 'dashboard'" x-transition:enter="transition ease-out duration-300"
-                    x-transition:enter-start="opacity-0 translate-y-4"
-                    x-transition:enter-end="opacity-100 translate-y-0">
-                    <header class="mb-8">
-                        <h2 class="text-3xl font-heading font-bold text-slate-900 dark:text-white">Dashboard</h2>
-                        <p class="text-slate-500 dark:text-slate-400 mt-1">Overview of your network status</p>
-                    </header>
-
-                    <!-- Stats Grid -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                        <!-- Clients Card -->
-                        <div
-                            class="bg-white dark:bg-dark-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border relative overflow-hidden group">
-                            <div
-                                class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                <span class="material-symbols-rounded text-6xl text-primary-500">group</span>
-                            </div>
-                            <div class="relative z-10">
-                                <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Clients</p>
-                                <h3 class="text-3xl font-bold text-slate-900 dark:text-white mt-1"
-                                    x-text="state.clients || 0">0</h3>
-                                <div
-                                    class="mt-4 flex items-center text-sm text-emerald-600 dark:text-emerald-400 font-medium">
-                                    <span class="material-symbols-rounded text-lg mr-1">check_circle</span>
-                                    <span>Active Network</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Forwardings Card -->
-                        <div
-                            class="bg-white dark:bg-dark-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border relative overflow-hidden group">
-                            <div
-                                class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                <span class="material-symbols-rounded text-6xl text-orange-500">alt_route</span>
-                            </div>
-                            <div class="relative z-10">
-                                <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Active Ports</p>
-                                <h3 class="text-3xl font-bold text-slate-900 dark:text-white mt-1"
-                                    x-text="state.forwardings || 0">0</h3>
-                                <div
-                                    class="mt-4 flex items-center text-sm text-orange-600 dark:text-orange-400 font-medium">
-                                    <span class="material-symbols-rounded text-lg mr-1">arrow_forward</span>
-                                    <span>Port Rules</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Network Card -->
-                        <div
-                            class="bg-white dark:bg-dark-surface p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border relative overflow-hidden group col-span-1 md:col-span-2">
-                            <div
-                                class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                <span class="material-symbols-rounded text-6xl text-indigo-500">hub</span>
-                            </div>
-                            <div class="relative z-10">
-                                <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Network Configuration
-                                </p>
-                                <div class="mt-2 space-y-2">
-                                    <div
-                                        class="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-800/50 rounded-lg">
-                                        <span class="text-xs font-bold text-slate-500 uppercase">Interface</span>
-                                        <span class="font-mono text-sm font-semibold text-slate-700 dark:text-slate-300"
-                                            x-text="state.interface">wg0</span>
-                                    </div>
-                                    <div
-                                        class="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-800/50 rounded-lg">
-                                        <span class="text-xs font-bold text-slate-500 uppercase">Subnet</span>
-                                        <span class="font-mono text-sm font-semibold text-slate-700 dark:text-slate-300"
-                                            x-text="state.network">10.8.0.0/24</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Quick Actions -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <button @click="openClientModal()"
-                            class="group p-6 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl shadow-lg shadow-primary-500/20 text-white text-left hover:shadow-xl hover:shadow-primary-500/30 transition-all duration-300 transform hover:-translate-y-1">
-                            <div class="flex items-center justify-between mb-4">
-                                <span class="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                                    <span class="material-symbols-rounded text-2xl">person_add</span>
-                                </span>
-                                <span
-                                    class="material-symbols-rounded text-2xl opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1">arrow_forward</span>
-                            </div>
-                            <h3 class="text-xl font-bold">Add New Client</h3>
-                            <p class="text-primary-100 mt-1 text-sm">Create a new peer configuration</p>
-                        </button>
-
-                        <button @click="openFwdModal()"
-                            class="group p-6 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl shadow-sm text-left hover:border-primary-500 dark:hover:border-primary-500 transition-all duration-300 transform hover:-translate-y-1">
-                            <div class="flex items-center justify-between mb-4">
-                                <span
-                                    class="p-3 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-xl">
-                                    <span class="material-symbols-rounded text-2xl">add_link</span>
-                                </span>
-                                <span
-                                    class="material-symbols-rounded text-2xl text-slate-400 group-hover:text-primary-500 transition-colors">arrow_forward</span>
-                            </div>
-                            <h3 class="text-xl font-bold text-slate-900 dark:text-white">Open Port</h3>
-                            <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Forward traffic to a client</p>
-                        </button>
-                    </div>
+        <!-- Forwarding View -->
+        <div x-show="currentTab === 'forwarding'" x-cloak x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+            <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-3xl font-heading font-bold text-slate-900 dark:text-white">Port Forwarding
+                    </h2>
+                    <p class="text-slate-500 dark:text-slate-400 mt-1">Manage traffic rules</p>
                 </div>
+                <button @click="openFwdModal()"
+                    class="btn-primary flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-medium shadow-lg shadow-primary-500/30 transition-all active:scale-95">
+                    <span class="material-symbols-rounded">add_link</span>
+                    New Rule
+                </button>
+            </header>
 
-                <!-- Clients View -->
-                <div x-show="currentTab === 'clients'" x-cloak x-transition:enter="transition ease-out duration-300"
-                    x-transition:enter-start="opacity-0 translate-y-4"
-                    x-transition:enter-end="opacity-100 translate-y-0">
-                    <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                            <h2 class="text-3xl font-heading font-bold text-slate-900 dark:text-white">Clients</h2>
-                            <p class="text-slate-500 dark:text-slate-400 mt-1">Manage connected peers</p>
-                        </div>
-                        <button @click="openClientModal()"
-                            class="btn-primary flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-medium shadow-lg shadow-primary-500/30 transition-all active:scale-95">
-                            <span class="material-symbols-rounded">add</span>
-                            New Client
-                        </button>
-                    </header>
-
-                    <!-- Search -->
-                    <div class="mb-6">
-                        <div class="relative max-w-md">
-                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <span class="material-symbols-rounded text-slate-400">search</span>
-                            </span>
-                            <input type="text" x-model="searchClient" placeholder="Search clients..."
-                                class="w-full pl-10 pr-4 py-2.5 rounded-xl border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow">
-                        </div>
-                    </div>
-
-                    <!-- Clients Grid -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        <template x-for="client in filteredClients" :key="client.public_key">
-                            <div
-                                class="bg-white dark:bg-dark-surface rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-dark-border hover:shadow-md transition-shadow group">
-                                <div class="flex items-start justify-between mb-4">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold uppercase"
-                                            :class="client.online ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'">
-                                            <span x-text="client.name.substring(0, 2)"></span>
-                                        </div>
-                                        <div>
-                                            <h3 class="font-bold text-slate-900 dark:text-white" x-text="client.name">
-                                            </h3>
-                                            <div class="flex items-center gap-1.5 mt-0.5">
-                                                <span class="w-2 h-2 rounded-full"
-                                                    :class="client.online ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'"></span>
-                                                <span class="text-xs font-medium text-slate-500 dark:text-slate-400"
-                                                    x-text="client.online ? 'Online' : 'Offline'"></span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="relative" x-data="{ open: false }">
-                                        <button @click="open = !open" @click.away="open = false"
-                                            class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
-                                            <span class="material-symbols-rounded">more_vert</span>
-                                        </button>
-                                        <div x-show="open"
-                                            class="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-surface rounded-xl shadow-xl border border-gray-100 dark:border-dark-border py-1 z-10"
-                                            x-cloak>
-                                            <a :href="client.config"
-                                                class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Download
-                                                Config</a>
-                                            <button @click="showQR(client)"
-                                                class="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Show
-                                                QR Code</button>
-                                            <div class="h-px bg-gray-100 dark:bg-dark-border my-1"></div>
-                                            <button @click="deleteClient(client.name)"
-                                                class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">Delete
-                                                Client</button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="space-y-3">
-                                    <div class="flex items-center justify-between text-sm">
-                                        <span class="text-slate-500 dark:text-slate-400">IP Address</span>
-                                        <span class="font-mono font-medium text-slate-700 dark:text-slate-300"
-                                            x-text="client.address"></span>
-                                    </div>
-                                    <div class="flex items-center justify-between text-sm">
-                                        <span class="text-slate-500 dark:text-slate-400">Last Seen</span>
-                                        <span class="font-medium text-slate-700 dark:text-slate-300"
-                                            x-text="formatTime(client.last_handshake)"></span>
-                                    </div>
-                                </div>
-
-                                <div class="mt-5 pt-4 border-t border-gray-100 dark:border-dark-border">
-                                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                                        Active Forwards</div>
-                                    <div class="flex flex-wrap gap-2">
-                                        <template x-for="fwd in client.forwardings" :key="fwd.port + fwd.protocol">
-                                            <span
-                                                class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800">
-                                                <span x-text="fwd.port"></span>
-                                                <span class="mx-1">→</span>
-                                                <span x-text="fwd.target_port || fwd.port"></span>
-                                                <span class="ml-1 opacity-75"
-                                                    x-text="'(' + fwd.protocol.toUpperCase() + ')'"></span>
-                                            </span>
-                                        </template>
-                                        <span x-show="!client.forwardings || client.forwardings.length === 0"
-                                            class="text-xs text-slate-400 italic">No active rules</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-
-                        <!-- Empty State -->
-                        <div x-show="filteredClients.length === 0" class="col-span-full py-12 text-center">
-                            <div
-                                class="w-16 h-16 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <span class="material-symbols-rounded text-3xl text-slate-400">search_off</span>
-                            </div>
-                            <h3 class="text-lg font-medium text-slate-900 dark:text-white">No clients found</h3>
-                            <p class="text-slate-500 dark:text-slate-400">Try adjusting your search or add a new client.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Forwarding View -->
-                <div x-show="currentTab === 'forwarding'" x-cloak x-transition:enter="transition ease-out duration-300"
-                    x-transition:enter-start="opacity-0 translate-y-4"
-                    x-transition:enter-end="opacity-100 translate-y-0">
-                    <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                            <h2 class="text-3xl font-heading font-bold text-slate-900 dark:text-white">Port Forwarding
-                            </h2>
-                            <p class="text-slate-500 dark:text-slate-400 mt-1">Manage traffic rules</p>
-                        </div>
-                        <button @click="openFwdModal()"
-                            class="btn-primary flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-medium shadow-lg shadow-primary-500/30 transition-all active:scale-95">
-                            <span class="material-symbols-rounded">add_link</span>
-                            New Rule
-                        </button>
-                    </header>
-
-                    <div
-                        class="bg-white dark:bg-dark-surface rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr
-                                        class="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-dark-border">
-                                        <th
-                                            class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                            Protocol</th>
-                                        <th
-                                            class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                            Public Port</th>
-                                        <th
-                                            class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                            Internal Port</th>
-                                        <th
-                                            class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                            Target Client</th>
-                                        <th
-                                            class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">
-                                            Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 dark:divide-dark-border">
-                                    <template x-for="rule in forwardings" :key="rule.port + rule.protocol">
-                                        <tr class="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
-                                            <td class="px-6 py-4">
-                                                <span
-                                                    class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold uppercase"
-                                                    :class="{
+            <div
+                class="bg-white dark:bg-dark-surface rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr
+                                class="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-dark-border">
+                                <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                    Protocol</th>
+                                <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                    Public Port</th>
+                                <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                    Internal Port</th>
+                                <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                    Target Client</th>
+                                <th
+                                    class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">
+                                    Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-dark-border">
+                            <template x-for="rule in forwardings" :key="rule.port + rule.protocol">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
+                                    <td class="px-6 py-4">
+                                        <span
+                                            class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold uppercase"
+                                            :class="{
                                                           'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300': rule.protocol === 'tcp',
                                                           'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300': rule.protocol === 'udp',
                                                           'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300': rule.protocol === 'both'
                                                       }" x-text="rule.protocol">
-                                                </span>
-                                            </td>
-                                            <td class="px-6 py-4 font-mono text-sm font-medium text-slate-700 dark:text-slate-300"
-                                                x-text="rule.port"></td>
-                                            <td class="px-6 py-4 font-mono text-sm text-slate-600 dark:text-slate-400"
-                                                x-text="rule.target_port || rule.port"></td>
-                                            <td class="px-6 py-4">
-                                                <div class="flex items-center gap-2">
-                                                    <span
-                                                        class="material-symbols-rounded text-slate-400 text-lg">computer</span>
-                                                    <span class="text-sm font-medium text-slate-700 dark:text-slate-300"
-                                                        x-text="getClientName(rule.client_ip)"></span>
-                                                    <span class="text-xs text-slate-400 font-mono"
-                                                        x-text="'(' + rule.client_ip + ')'"></span>
-                                                </div>
-                                            </td>
-                                            <td class="px-6 py-4 text-right">
-                                                <button @click="deleteForwarding(rule.port, rule.protocol)"
-                                                    class="text-slate-400 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
-                                                    <span class="material-symbols-rounded">delete</span>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    </template>
-                                    <tr x-show="forwardings.length === 0">
-                                        <td colspan="5"
-                                            class="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
-                                            No forwarding rules defined yet.
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 font-mono text-sm font-medium text-slate-700 dark:text-slate-300"
+                                        x-text="rule.port"></td>
+                                    <td class="px-6 py-4 font-mono text-sm text-slate-600 dark:text-slate-400"
+                                        x-text="rule.target_port || rule.port"></td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-2">
+                                            <span
+                                                class="material-symbols-rounded text-slate-400 text-lg">computer</span>
+                                            <span class="text-sm font-medium text-slate-700 dark:text-slate-300"
+                                                x-text="getClientName(rule.client_ip)"></span>
+                                            <span class="text-xs text-slate-400 font-mono"
+                                                x-text="'(' + rule.client_ip + ')'"></span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 text-right">
+                                        <button @click="deleteForwarding(rule.port, rule.protocol)"
+                                            class="text-slate-400 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
+                                            <span class="material-symbols-rounded">delete</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                            <tr x-show="forwardings.length === 0">
+                                <td colspan="5" class="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
+                                    No forwarding rules defined yet.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-
             </div>
-        </main>
+        </div>
+
+        </div>
+    </main>
     </div>
 
     <!-- Modals -->
@@ -611,10 +607,10 @@
                                 <div>
                                     <label
                                         class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Public
-                                        Port</label>
-                                    <input type="number" x-model="forms.fwd.port" required
+                                        Port (or Range)</label>
+                                    <input type="text" x-model="forms.fwd.port" required
                                         class="w-full rounded-xl border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-slate-900 dark:text-white focus:ring-primary-500 focus:border-primary-500"
-                                        placeholder="20000">
+                                        placeholder="20000 or 8000-8100">
                                 </div>
                                 <div>
                                     <label
@@ -622,7 +618,7 @@
                                         Port</label>
                                     <input type="number" x-model="forms.fwd.target_port"
                                         class="w-full rounded-xl border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-slate-900 dark:text-white focus:ring-primary-500 focus:border-primary-500"
-                                        placeholder="Same as public">
+                                        placeholder="Same as public (Optional)">
                                 </div>
                             </div>
                             <div>
@@ -646,6 +642,15 @@
                                             x-text="client.name + ' (' + client.address.split('/')[0] + ')'"></option>
                                     </template>
                                 </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Source
+                                    IP Whitelist (Optional)</label>
+                                <input type="text" x-model="forms.fwd.source_ip"
+                                    class="w-full rounded-xl border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-slate-900 dark:text-white focus:ring-primary-500 focus:border-primary-500"
+                                    placeholder="e.g. 1.2.3.4 or 192.168.1.0/24">
+                                <p class="text-xs text-slate-500 mt-1">Leave empty to allow connections from anywhere.
+                                </p>
                             </div>
                         </div>
                         <div class="mt-6 flex justify-end gap-3">
@@ -743,7 +748,7 @@
 
                 forms: {
                     client: { name: '', address: '' },
-                    fwd: { port: '', target_port: '', protocol: 'both', client_ip: '' }
+                    fwd: { port: '', target_port: '', protocol: 'both', client_ip: '', source_ip: '' }
                 },
 
                 toast: {
@@ -778,12 +783,30 @@
                     this.isDarkMode = !this.isDarkMode;
                 },
 
+                async logout() {
+                    try {
+                        await fetch('/auth/logout', { method: 'POST' });
+                        window.location.href = '/login';
+                    } catch (e) {
+                        window.location.reload();
+                    }
+                },
+
+                checkAuth(res) {
+                    if (res.status === 401) {
+                        window.location.href = '/login';
+                        throw { status: 401 };
+                    }
+                    if (!res.ok) throw res;
+                    return res;
+                },
+
                 async loadData() {
                     try {
                         const [stateRes, clientsRes, fwdRes] = await Promise.all([
-                            fetch('/api/state'),
-                            fetch('/api/clients'),
-                            fetch('/api/forwardings')
+                            fetch('/api/state').then(this.checkAuth),
+                            fetch('/api/clients').then(this.checkAuth),
+                            fetch('/api/forwardings').then(this.checkAuth)
                         ]);
 
                         this.state = await stateRes.json();
@@ -792,8 +815,8 @@
                         const fwdData = await fwdRes.json();
                         this.forwardings = fwdData.items;
                     } catch (err) {
+                        if (err.status === 401) return;
                         console.error('Failed to load data', err);
-                        this.showToast('Connection lost. Retrying...', 'error');
                     }
                 },
 
@@ -807,27 +830,36 @@
                 },
 
                 getClientName(ip) {
+                    if (!ip) return 'Unknown';
+                    // Match IP from CIDR if needed, or exact match
                     const client = this.clients.find(c => c.address.split('/')[0] === ip);
                     return client ? client.name : 'Unknown';
                 },
 
                 formatTime(timestamp) {
                     if (!timestamp) return 'Never';
-                    const date = new Date(timestamp * 1000);
-                    const now = new Date();
-                    const diff = Math.floor((now - date) / 1000); // seconds
-
+                    const diff = Math.floor(Date.now() / 1000) - timestamp;
                     if (diff < 60) return 'Just now';
-                    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-                    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-                    return date.toLocaleDateString();
+                    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+                    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+                    return Math.floor(diff / 86400) + 'd ago';
+                },
+
+                formatBytes(bytes) {
+                    if (!bytes) return '0 B';
+                    const k = 1024;
+                    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
                 },
 
                 showToast(message, type = 'success') {
                     this.toast.message = message;
                     this.toast.type = type;
                     this.toast.show = true;
-                    setTimeout(() => this.toast.show = false, 3000);
+                    setTimeout(() => {
+                        this.toast.show = false;
+                    }, 3000);
                 },
 
                 openClientModal() {
@@ -836,7 +868,7 @@
                 },
 
                 openFwdModal() {
-                    this.forms.fwd = { port: '', target_port: '', protocol: 'both', client_ip: '' };
+                    this.forms.fwd = { port: '', target_port: '', protocol: 'both', client_ip: '', source_ip: '' };
                     this.modals.fwd = true;
                 },
 
@@ -849,60 +881,67 @@
                     try {
                         const res = await fetch('/api/clients', {
                             method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(this.forms.client)
-                        });
-                        if (!res.ok) throw new Error((await res.json()).description || 'Failed to create client');
+                        }).then(this.checkAuth);
 
+                        const data = await res.json();
+                        this.showToast(`Client ${data.name} created!`);
                         this.modals.client = false;
-                        this.showToast('Client created successfully');
                         this.loadData();
                     } catch (err) {
-                        this.showToast(err.message, 'error');
+                        // Try to parse error
+                        try {
+                            const data = await err.json();
+                            this.showToast(data.description || 'Error creating client', 'error');
+                        } catch (e) {
+                            this.showToast('Error creating client', 'error');
+                        }
                     }
                 },
 
                 async deleteClient(name) {
-                    if (!confirm(`Are you sure you want to delete ${name}?`)) return;
+                    if (!confirm('Are you sure? This will delete the client and its keys.')) return;
                     try {
-                        const res = await fetch(`/api/clients/${encodeURIComponent(name)}`, { method: 'DELETE' });
-                        if (!res.ok) throw new Error('Failed to delete client');
-
+                        await fetch(`/api/clients/${name}`, { method: 'DELETE' }).then(this.checkAuth);
                         this.showToast('Client deleted');
                         this.loadData();
                     } catch (err) {
-                        this.showToast(err.message, 'error');
+                        this.showToast('Error deleting client', 'error');
                     }
                 },
 
                 async createForwarding() {
                     try {
-                        const payload = { ...this.forms.fwd };
-                        if (!payload.target_port) payload.target_port = payload.port;
-
                         const res = await fetch('/api/forwardings', {
                             method: 'POST',
-                            body: JSON.stringify(payload)
-                        });
-                        if (!res.ok) throw new Error((await res.json()).description || 'Failed to create rule');
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.forms.fwd)
+                        }).then(this.checkAuth);
 
+                        this.showToast('Forwarding rule added! 🎉');
                         this.modals.fwd = false;
-                        this.showToast('Forwarding rule added');
                         this.loadData();
                     } catch (err) {
-                        this.showToast(err.message, 'error');
+                        try {
+                            const data = await err.json();
+                            this.showToast(data.description || 'Error creating rule', 'error');
+                        } catch (e) {
+                            this.showToast('Error creating rule', 'error');
+                        }
                     }
                 },
 
                 async deleteForwarding(port, proto) {
-                    if (!confirm(`Delete forwarding rule for port ${port}?`)) return;
+                    if (!confirm('Remove this forwarding rule?')) return;
                     try {
-                        const res = await fetch(`/api/forwardings/${port}/${proto}`, { method: 'DELETE' });
-                        if (!res.ok) throw new Error('Failed to delete rule');
-
-                        this.showToast('Rule deleted');
+                        // Encode the slash in port ranges if present
+                        const encodedPort = encodeURIComponent(port);
+                        await fetch(`/api/forwardings/${encodedPort}/${proto}`, { method: 'DELETE' }).then(this.checkAuth);
+                        this.showToast('Rule removed');
                         this.loadData();
                     } catch (err) {
-                        this.showToast(err.message, 'error');
+                        this.showToast('Error removing rule', 'error');
                     }
                 }
             }
@@ -911,3 +950,4 @@
 </body>
 
 </html>
+```

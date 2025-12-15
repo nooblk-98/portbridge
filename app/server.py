@@ -8,7 +8,9 @@ import subprocess
 import time
 from pathlib import Path
 
-from flask import Flask, abort, jsonify, request, send_file
+from flask import Flask, abort, jsonify, request, send_file, redirect, render_template
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
 import segno
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
@@ -28,6 +30,12 @@ _default_forward_target = next(_hosts, _default_address)
 WG_ADDRESS = ipaddress.ip_interface(os.environ.get("WG_ADDRESS", f"{_default_address}/{WG_NETWORK.prefixlen}"))
 DEFAULT_FORWARD_TARGET = os.environ.get("DEFAULT_FORWARD_TARGET", str(_default_forward_target))
 DEFAULT_CLIENT_NAME = os.environ.get("DEFAULT_CLIENT_NAME", "default")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")  # Default password
+
+# Simple User class
+class User(UserMixin):
+    def __init__(self, id):
+        self.id = id
 
 NAT_CHAIN = "WG_FORWARDER"
 FILTER_CHAIN = "WG_FORWARDER_FWD"
@@ -38,6 +46,15 @@ logging.basicConfig(
 )
 
 app = Flask(__name__, static_folder="static", static_url_path="")
+app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+
+login_manager = LoginManager()
+login_manager.login_view = "login_page"
+login_manager.init_app(app)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User(user_id)
 
 
 def run(cmd, check=True, input_data=None):
@@ -213,54 +230,67 @@ def apply_forwardings(rules):
 
     for rule in rules:
         try:
-            port = int(rule["port"])
+            # Handle Port Ranges (e.g., "8000-8100" or just "8000")
+            port_input = str(rule["port"])
+            is_range = "-" in port_input
+            
+            if is_range:
+                start_port, end_port = map(int, port_input.split("-"))
+                dport_arg = f"{start_port}:{end_port}"
+                validation_port = start_port
+            else:
+                port = int(port_input)
+                dport_arg = str(port)
+                validation_port = port
+
             proto = rule.get("protocol", "both").lower()
             client_ip = str(ipaddress.ip_address(rule["client_ip"]))
-            target_port = int(rule.get("target_port", port))
-        except Exception:
-            continue
+            
+            # Target port logic handling for ranges is complex. 
+            # For ranges, we usually map 1:1, so target_port is ignored or must match start.
+            # For single ports, we use target_port.
+            if is_range:
+                to_dest = f"{client_ip}:{start_port}-{end_port}"
+                dest_port_arg = dport_arg
+            else:
+                target_port = int(rule.get("target_port", port))
+                to_dest = f"{client_ip}:{target_port}"
+                dest_port_arg = str(target_port)
 
-        if port <= 0 or port >= 65536:
+            source_ip = rule.get("source_ip", "").strip()
+
+        except Exception as e:
+            logging.error(f"Skipping invalid rule {rule}: {e}")
             continue
 
         protocols = ["tcp", "udp"] if proto == "both" else [proto]
         for name in protocols:
-            run(
-                [
-                    "iptables",
-                    "-t",
-                    "nat",
-                    "-A",
-                    NAT_CHAIN,
-                    "-i",
-                    ext_iface,
-                    "-p",
-                    name,
-                    "--dport",
-                    str(port),
-                    "-j",
-                    "DNAT",
-                    "--to-destination",
-                    f"{client_ip}:{target_port}",
-                ]
-            )
-            run(
-                [
-                    "iptables",
-                    "-t",
-                    "filter",
-                    "-A",
-                    FILTER_CHAIN,
-                    "-p",
-                    name,
-                    "-d",
-                    client_ip,
-                    "--dport",
-                    str(target_port),
-                    "-j",
-                    "ACCEPT",
-                ]
-            )
+            # DNAT Rule
+            dnat_cmd = [
+                "iptables", "-t", "nat", "-A", NAT_CHAIN,
+                "-i", ext_iface,
+                "-p", name,
+                "--dport", dport_arg,
+                "-j", "DNAT",
+                "--to-destination", to_dest
+            ]
+            if source_ip:
+                dnat_cmd.extend(["-s", source_ip])
+            
+            run(dnat_cmd)
+
+            # Filter Rule (FORWARD)
+            filter_cmd = [
+                "iptables", "-t", "filter", "-A", FILTER_CHAIN,
+                "-p", name,
+                "-d", client_ip,
+                "--dport", dest_port_arg,
+                "-j", "ACCEPT"
+            ]
+            if source_ip:
+                filter_cmd.extend(["-s", source_ip])
+                
+            run(filter_cmd)
 
     ensure_masquerade(ext_iface)
     logging.info("Applied %s forwarding rules", len(rules))
@@ -277,6 +307,17 @@ def protocols_overlap(existing_proto, new_proto):
 def peer_status_map():
     status = {}
     now = int(time.time())
+    
+    # Get Transfer stats
+    transfer = {}
+    res_transfer = run(["wg", "show", WG_INTERFACE, "transfer"], check=False)
+    if res_transfer.returncode == 0 and res_transfer.stdout:
+        for line in res_transfer.stdout.splitlines():
+            parts = line.split()
+            if len(parts) >= 3:
+                # pubkey: rx tx
+                transfer[parts[0]] = {"rx": int(parts[1]), "tx": int(parts[2])}
+
     res = run(["wg", "show", WG_INTERFACE, "latest-handshakes"], check=False)
     if res.returncode != 0 or not res.stdout:
         return status
@@ -295,7 +336,16 @@ def peer_status_map():
         except ValueError:
             ts = 0
         online = ts > 0 and (now - ts) < 180
-        status[pubkey] = {"handshake": ts, "online": online, "age": now - ts if ts else None}
+        
+        t_stats = transfer.get(pubkey, {"rx": 0, "tx": 0})
+        
+        status[pubkey] = {
+            "handshake": ts, 
+            "online": online, 
+            "age": now - ts if ts else None,
+            "rx_bytes": t_stats["rx"],
+            "tx_bytes": t_stats["tx"]
+        }
     return status
 
 
@@ -353,6 +403,7 @@ def bootstrap():
 
 
 @app.get("/api/state")
+@login_required
 def api_state():
     clients = load_clients()
     forwardings = load_forwardings()
@@ -369,6 +420,7 @@ def api_state():
 
 
 @app.get("/api/clients")
+@login_required
 def api_clients():
     server_public = ensure_server_keys()[1]
     clients = load_clients()
@@ -386,6 +438,8 @@ def api_clients():
                 "config": f"/clients/{client['name']}.conf",
                 "online": bool(peer_state.get("online")),
                 "last_handshake": peer_state.get("handshake"),
+                "rx_bytes": peer_state.get("rx_bytes", 0),
+                "tx_bytes": peer_state.get("tx_bytes", 0),
                 "forwardings": forwards,
             }
         )
@@ -393,6 +447,7 @@ def api_clients():
 
 
 @app.post("/api/clients")
+@login_required
 def api_create_client():
     body = request.get_json(force=True, silent=True) or {}
     name = body.get("name") or f"client-{int(time.time())}"
@@ -434,6 +489,7 @@ def api_create_client():
 
 
 @app.delete("/api/clients/<name>")
+@login_required
 def api_delete_client(name):
     clients = load_clients()
     updated = [c for c in clients if c["name"] != name]
@@ -451,6 +507,7 @@ def api_delete_client(name):
 
 
 @app.get("/clients/<name>.conf")
+@login_required
 def api_download_client(name):
     path = CLIENTS_DIR / f"{name}.conf"
     if not path.exists():
@@ -459,6 +516,7 @@ def api_download_client(name):
 
 
 @app.get("/clients/<name>.png")
+@login_required
 def api_qr_client(name):
     path = CLIENTS_DIR / f"{name}.conf"
     if not path.exists():
@@ -472,18 +530,29 @@ def api_qr_client(name):
 
 
 @app.get("/api/forwardings")
+@login_required
 def api_forwardings():
     rules = load_forwardings()
     return jsonify({"items": rules})
 
 
 @app.post("/api/forwardings")
+@login_required
 def api_add_forwarding():
     body = request.get_json(force=True, silent=True) or {}
     try:
-        port = int(body.get("port"))
+        # Port can be int or string (range)
+        port_raw = body.get("port")
+        if "-" in str(port_raw):
+            # Validate range
+            s, e = map(int, str(port_raw).split("-"))
+            if s >= e:
+                abort(400, description="Invalid port range.")
+            port = str(port_raw)
+        else:
+            port = int(port_raw)
     except Exception:
-        abort(400, description="Port must be numeric.")
+        abort(400, description="Port must be numeric or range (e.g. 8000-8100).")
 
     proto = (body.get("protocol") or "both").lower()
     if proto not in ("tcp", "udp", "both"):
@@ -496,6 +565,16 @@ def api_add_forwarding():
         client_ip = ipaddress.ip_address(client_ip_raw)
     except ValueError:
         abort(400, description="Invalid client_ip.")
+
+    source_ip = body.get("source_ip")
+    if source_ip:
+        try:
+            ipaddress.ip_address(source_ip)
+        except ValueError:
+            try:
+                ipaddress.ip_network(source_ip)
+            except ValueError:
+                 abort(400, description="Invalid source IP/CIDR.")
 
     target_port_raw = body.get("target_port") or port
     try:
@@ -518,22 +597,29 @@ def api_add_forwarding():
         r
         for r in rules
         if not (
-            int(r.get("port", -1)) == port
+            str(r.get("port", -1)) == str(port)
             and r.get("protocol", "both") == proto
         )
     ]
-    rules.append({"port": port, "protocol": proto, "client_ip": str(client_ip), "target_port": target_port})
+    rules.append({
+        "port": port, 
+        "protocol": proto, 
+        "client_ip": str(client_ip), 
+        "target_port": target_port,
+        "source_ip": source_ip
+    })
 
     save_json(FORWARD_FILE, rules)
     apply_forwardings(rules)
     return jsonify({"port": port, "protocol": proto, "client_ip": str(client_ip), "target_port": target_port})
 
 
-@app.delete("/api/forwardings/<int:port>/<proto>")
+@app.delete("/api/forwardings/<path:port>/<proto>")
+@login_required
 def api_delete_forwarding(port, proto):
     proto = proto.lower()
     rules = load_forwardings()
-    updated = [r for r in rules if not (int(r.get("port", -1)) == port and r.get("protocol", "both") == proto)]
+    updated = [r for r in rules if not (str(r.get("port", -1)) == str(port) and r.get("protocol", "both") == proto)]
     if len(updated) == len(rules):
         abort(404)
     save_json(FORWARD_FILE, updated)
@@ -542,12 +628,36 @@ def api_delete_forwarding(port, proto):
 
 
 @app.get("/api/wg/status")
+@login_required
 def api_wg_status():
     status = run(["wg", "show"], check=False)
     return jsonify({"output": (status.stdout or status.stderr or "").splitlines()})
 
 
+@app.post("/auth/login")
+def auth_login():
+    data = request.get_json(silent=True) or {}
+    password = data.get("password")
+    if password == ADMIN_PASSWORD:
+        user = User(1)
+        login_user(user, remember=True)
+        return jsonify({"status": "ok"})
+    return jsonify({"error": "Invalid password"}), 401
+
+@app.post("/auth/logout")
+@login_required
+def auth_logout():
+    logout_user()
+    return jsonify({"status": "ok"})
+
+@app.get("/login")
+def login_page():
+    if current_user.is_authenticated:
+        return redirect("/")
+    return app.send_static_file("login.html")
+
 @app.get("/")
+@login_required
 def index():
     return app.send_static_file("index.html")
 

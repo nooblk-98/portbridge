@@ -13,7 +13,10 @@ A professional, lightweight, and user-friendly solution for managing WireGuard p
 *   **Easy Peer Management**: Create, delete, and manage WireGuard clients with a few clicks.
 *   **QR Code Support**: Instantly generate QR codes for mobile client configuration.
 *   **Dynamic Port Forwarding**: Forward TCP/UDP ports from your public server to any connected client.
-*   **Real-time Status**: Monitor client online status and handshake times.
+*   **Port Range Support**: Forward entire ranges of ports (e.g., `8000-8100`) for games and complex apps.
+*   **Source IP Whitelisting**: Restrict access to forwarded ports to specific IP addresses for enhanced security.
+*   **Real-time Monitoring**: View client online status, handshake times, and **bandwidth usage (RX/TX)**.
+*   **Secure Dashboard**: Built-in authentication to protect your management UI.
 *   **Dark Mode**: Fully supported dark theme for comfortable viewing.
 *   **Dockerized**: Runs in a lightweight Alpine container with minimal dependencies.
 
@@ -76,7 +79,7 @@ sequenceDiagram
     ```yaml
     environment:
       - WG_HOST=your.public.ip.address  # IMPORTANT: Your VPS Public IP
-      - WG_PASSWORD=secure_password      # Optional: For future auth features
+      - ADMIN_PASSWORD=secure_password   # Dashboard Login Password (Default: admin)
     ```
 
 2.  **Run the Container**:
@@ -119,10 +122,11 @@ Now that your client is connected, let's expose a service (e.g., a Minecraft ser
 2.  **Open a Port**:
     *   Go to the **Forwarding** tab in the Web UI.
     *   Click **"New Rule"**.
-    *   **Public Port**: `20000` (The port you want to open on the VPS).
+    *   **Public Port**: `20000` (or a range `8000-8100`).
     *   **Internal Port**: `80` (The port your service is running on).
     *   **Protocol**: `TCP` (or UDP/Both depending on the service).
     *   **Target Client**: Select `Home-Server`.
+    *   **Source IP (Optional)**: Enter an IP `1.2.3.4` to only allow connections from that IP.
     *   Click **Add Rule**.
 3.  **Access**:
     *   Anyone can now access your home web app via `http://<VPS-Public-IP>:20000`.
@@ -158,9 +162,7 @@ Now that your client is connected, let's expose a service (e.g., a Minecraft ser
 ## 🛡️ Security Notes
 
 *   **Firewall**: The application manages `iptables` for forwarding, but ensure your VPS firewall (UFW/Security Groups) allows the ports you want to expose (e.g., 20000, 25565).
-*   **Web UI Access**: The Web UI runs on port `3000` by default. **It is currently unauthenticated.** It is highly recommended to:
-    *   Run it behind a reverse proxy (Nginx/Caddy) with Basic Auth.
-    *   Or restrict access to your IP using a firewall.
+*   **Web UI Access**: The Web UI runs on port `3000`. It is protected by a login page (configure `ADMIN_PASSWORD` in docker-compose).
 
 ## 🤝 Contributing
 
