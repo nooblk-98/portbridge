@@ -64,10 +64,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.DOCKERHUB }}/portbridge :latest
-            ${{ env.DOCKERHUB }}/portbridge :${{ needs.get-release-tag.outputs.tag_name }}
-            ghcr.io/${{ github.repository_owner }}/portbridge :latest
-            ghcr.io/${{ github.repository_owner }}/portbridge :${{ needs.get-release-tag.outputs.tag_name }}
+            ${{ env.DOCKERHUB }}/portbridge:latest
+            ${{ env.DOCKERHUB }}/portbridge:${{ needs.get-release-tag.outputs.tag_name }}
+            ghcr.io/${{ github.repository_owner }}/portbridge:latest
+            ghcr.io/${{ github.repository_owner }}/portbridge:${{ needs.get-release-tag.outputs.tag_name }}
 
   sync-dockerhub:
     runs-on: ubuntu-latest
