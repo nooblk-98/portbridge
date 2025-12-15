@@ -1,15 +1,18 @@
+version: "3.8"
+
 services:
   wg-forwarder:
-    build:
-      context: .
-    container_name: wg-forwarder
+    image: ghcr.io/nooblk-98/portbridge:latest
+    container_name: portbridge
+
     environment:
-      - WG_HOST=202.124.164.163
-      - WG_PORT=51820
-      - WG_NETWORK=10.8.0.0/24
-      - WG_ADDRESS=10.8.0.1/24
-      - APP_PORT=3000
-      - ADMIN_PASSWORD=admin
+      WG_HOST: 80.225.221.245
+      WG_PORT: 51820
+      WG_NETWORK: 10.8.0.0/24
+      WG_ADDRESS: 10.8.0.1/24
+      APP_PORT: 3000
+      ADMIN_PASSWORD: admin
+
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
@@ -20,16 +23,12 @@ services:
       - "51820:51820/udp"
       - "3000:3000/tcp"
       - "30000-30100:30000-30100/tcp"
+
     volumes:
       - wg-data:/data
       - /lib/modules:/lib/modules:ro
-    networks:
-      - wg-network
-    restart: unless-stopped
 
-networks:
-  wg-network:
-    driver: bridge
+    restart: unless-stopped
 
 volumes:
   wg-data:
