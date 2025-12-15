@@ -1,14 +1,14 @@
 name: Build and Push Docker Images
 
 on:
-push:
-  branches:
-    - main
-release:
-  types: [published]
-workflow_dispatch:
-repository_dispatch:
-  types: [release-completed]
+  push:
+    branches:
+      - main
+  release:
+    types: [published]
+  workflow_dispatch:
+  repository_dispatch:
+    types: [release-completed]
 
 env:
   DOCKERHUB: lahiru98s
