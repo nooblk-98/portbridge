@@ -6,7 +6,14 @@ A professional, lightweight WireGuard manager and port forwarding solution. Easi
 
 ---
 
-## � Quick Start
+## 🚀 Quick Start
+
+**One-Line Deployment:**
+```bash
+wget -O docker-compose.yml https://raw.githubusercontent.com/nooblk-98/lighthouse/refs/heads/main/docker-compose.live.yml && docker compose up -d
+```
+
+**Manual Configuration:**
 
 ```yaml
 version: "3.8"

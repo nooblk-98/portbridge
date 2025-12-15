@@ -82,7 +82,14 @@ sequenceDiagram
 *   Docker and Docker Compose installed.
 *   Root access (required for managing network interfaces).
 
-### Deployment Steps
+### Quick Start
+
+**One-Line Deployment:**
+```bash
+wget -O docker-compose.yml https://raw.githubusercontent.com/nooblk-98/lighthouse/refs/heads/main/docker-compose.live.yml && docker compose up -d
+```
+
+### Manual Configuration
 
 1.  **Configure Environment**:
     Create a `.env` file or modify `docker-compose.yml`:
