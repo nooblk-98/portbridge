@@ -18,6 +18,6 @@ COPY app /app
 COPY config /app/config
 
 ENV PYTHONUNBUFFERED=1
-EXPOSE 20000 51820/udp
+EXPOSE 51820/udp
 
 CMD ["python3", "/app/server.py"]
