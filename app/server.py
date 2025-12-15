@@ -323,14 +323,11 @@ def peer_status_map():
         return status
 
     for line in res.stdout.splitlines():
-        if ":" not in line:
-            continue
-        left, right = line.split(":", 1)
-        parts = left.strip().split()
+        parts = line.split()
         if len(parts) < 2:
             continue
-        pubkey = parts[1]
-        ts_raw = right.strip().split()[0]
+        pubkey = parts[0]
+        ts_raw = parts[1]
         try:
             ts = int(ts_raw)
         except ValueError:
