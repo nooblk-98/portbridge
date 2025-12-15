@@ -585,6 +585,27 @@ def api_add_forwarding():
     if client_ip not in WG_NETWORK:
         abort(400, description="client_ip outside WireGuard network.")
 
+    # Security: Prevent forwarding critical ports
+    reserved_ports = [
+        int(os.environ.get("WG_PORT", 51820)),
+        int(os.environ.get("APP_PORT", 3000))
+    ]
+    
+    # Check for conflict
+    conflict = False
+    if "-" in str(port):
+        s, e = map(int, str(port).split("-"))
+        for rp in reserved_ports:
+            if s <= rp <= e:
+                conflict = True
+                break
+    else:
+        if int(port) in reserved_ports:
+            conflict = True
+
+    if conflict:
+        abort(400, description=f"Cannot forward reserved system ports ({', '.join(map(str, reserved_ports))}).")
+
     rules = load_forwardings()
     for rule in rules:
         existing_proto = rule.get("protocol", "both")
