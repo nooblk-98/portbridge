@@ -151,15 +151,14 @@
                 <span class="material-symbols-rounded text-lg">logout</span>
                 <span>Sign Out</span>
             </button>
-    </div>
-    <div class="p-4 border-t border-gray-200 dark:border-dark-border text-center">
-        <button @click="toggleTheme()"
-            class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-200 dark:border-dark-border text-slate-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-sm font-medium">
-            <span class="material-symbols-rounded text-lg" x-text="isDarkMode ? 'light_mode' : 'dark_mode'"></span>
-            <span x-text="isDarkMode ? 'Light Mode' : 'Dark Mode'"></span>
-        </button>
-    </div>
-    </aside>
+            <div class="p-4 border-t border-gray-200 dark:border-dark-border text-center">
+                <button @click="toggleTheme()"
+                    class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-200 dark:border-dark-border text-slate-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-sm font-medium">
+                    <span class="material-symbols-rounded text-lg" x-text="isDarkMode ? 'light_mode' : 'dark_mode'"></span>
+                    <span x-text="isDarkMode ? 'Light Mode' : 'Dark Mode'"></span>
+                </button>
+            </div>
+        </aside>
 
     <!-- Mobile Header -->
     <div
