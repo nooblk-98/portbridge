@@ -361,10 +361,23 @@ def load_forwardings(default_client_ip=None):
     return []
 
 
+def seamless_reload():
+    try:
+        # Generate raw wg config using wg-quick strip
+        stripped = run(["wg-quick", "strip", str(WG_CONFIG_PATH)]).stdout
+        
+        # Sync the configuration without down/up
+        run(["wg", "syncconf", WG_INTERFACE, "/dev/stdin"], input_data=stripped)
+        log_wireguard_status()
+    except Exception as e:
+        logging.warning("Seamless reload failed (%s), falling back to bounce", e)
+        bounce_interface()
+
+
 def refresh_wireguard(clients):
     server_private, _ = ensure_server_keys()
     render_wireguard_config(clients, server_private)
-    bounce_interface()
+    seamless_reload()
     logging.info("Reloaded WireGuard with %s clients", len(clients))
 
 
