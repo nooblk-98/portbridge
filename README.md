@@ -1,10 +1,20 @@
-# WireGuard Port Forwarder & Manager
+<div align="center">
+  <img src="./images/logo/logo.png" width="360" alt="PortBridge logo" />
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Docker](https://img.shields.io/badge/docker-alpine-blue)
-![Status](https://img.shields.io/badge/status-active-success)
+  # PortBridge
 
 A professional, lightweight, and user-friendly solution for managing WireGuard peers and port forwarding rules. Designed to easily expose services running behind NAT (like home routers or private networks) through a public VPS, without needing a public IP at the source.
+
+  <div>
+    <a href="https://hub.docker.com/r/lahiru98s/portbridge "><img src="https://img.shields.io/docker/pulls/lahiru98s/portbridge .svg" alt="Docker UI pulls" /></a>
+    <a href="https://github.com/nooblk-98/lighthouse/releases"><img src="https://img.shields.io/github/v/release/nooblk-98/lighthouse?logo=github" alt="Latest release" /></a>
+    <a href="https://github.com/nooblk-98/lighthouse/actions/workflows/docker-build-push.yml"><img src="https://github.com/nooblk-98/lighthouse/actions/workflows/docker-build-push.yml/badge.svg" alt="CI" /></a>
+     <a href="https://creativecommons.org/licenses/by-nc/2.0/">
+    <img src="https://img.shields.io/badge/License-CC%20BY--NC%202.0-blue.svg" alt="License: CC BY-NC 2.0" />
+  </div>
+</div>
+
+---
 
 ![Dashboard Screenshot](images/dashboard.png)
 
