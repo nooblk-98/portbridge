@@ -13,12 +13,25 @@ function app() {
         modals: {
             client: false,
             fwd: false,
-            qr: false
+            qr: false,
+            rename: false,
+            confirmDelete: false,
+            confirmDeleteFwd: false,
         },
 
         forms: {
             client: { name: '', address: '' },
-            fwd: { port: '', target_port: '', protocol: 'both', client_ip: '', source_ip: '' }
+            fwd: { port: '', target_port: '', protocol: 'both', client_ip: '', source_ip: '' },
+            rename: { oldName: '', newName: '' },
+        },
+
+        pendingDelete: { type: null, name: null, port: null, proto: null },
+
+        loading: {
+            createClient: false,
+            createFwd: false,
+            rename: false,
+            delete: false,
         },
 
         toast: {
@@ -35,17 +48,14 @@ function app() {
 
         initApp() {
             this.loadData();
-            // Auto refresh every 10 seconds
-            setInterval(() => this.loadData(), 10000);
+            setInterval(() => this.loadData(), 30000);
 
-            // Watch for theme changes
             this.$watch('isDarkMode', val => {
                 localStorage.setItem('theme', val ? 'dark' : 'light');
                 if (val) document.documentElement.classList.add('dark');
                 else document.documentElement.classList.remove('dark');
             });
 
-            // Initial theme set
             if (this.isDarkMode) document.documentElement.classList.add('dark');
         },
 
@@ -101,7 +111,6 @@ function app() {
 
         getClientName(ip) {
             if (!ip) return 'Unknown';
-            // Match IP from CIDR if needed, or exact match
             const client = this.clients.find(c => c.address.split('/')[0] === ip);
             return client ? client.name : 'Unknown';
         },
@@ -127,9 +136,7 @@ function app() {
             this.toast.message = message;
             this.toast.type = type;
             this.toast.show = true;
-            setTimeout(() => {
-                this.toast.show = false;
-            }, 3000);
+            setTimeout(() => { this.toast.show = false; }, 3000);
         },
 
         openClientModal() {
@@ -147,7 +154,23 @@ function app() {
             this.modals.qr = true;
         },
 
+        openRenameModal(client) {
+            this.forms.rename = { oldName: client.name, newName: client.name };
+            this.modals.rename = true;
+        },
+
+        confirmDeleteClient(name) {
+            this.pendingDelete = { type: 'client', name, port: null, proto: null };
+            this.modals.confirmDelete = true;
+        },
+
+        confirmDeleteForwarding(port, proto) {
+            this.pendingDelete = { type: 'forwarding', name: null, port, proto };
+            this.modals.confirmDeleteFwd = true;
+        },
+
         async createClient() {
+            this.loading.createClient = true;
             try {
                 const res = await fetch('/api/clients', {
                     method: 'POST',
@@ -160,36 +183,72 @@ function app() {
                 this.modals.client = false;
                 this.loadData();
             } catch (err) {
-                // Try to parse error
                 try {
                     const data = await err.json();
                     this.showToast(data.description || 'Error creating client', 'error');
                 } catch (e) {
                     this.showToast('Error creating client', 'error');
                 }
+            } finally {
+                this.loading.createClient = false;
             }
         },
 
-        async deleteClient(name) {
-            if (!confirm('Are you sure? This will delete the client and its keys.')) return;
+        async renameClient() {
+            this.loading.rename = true;
             try {
-                await fetch(`/api/clients/${name}`, { method: 'DELETE' }).then(this.checkAuth);
-                this.showToast('Client deleted');
+                await fetch(`/api/clients/${encodeURIComponent(this.forms.rename.oldName)}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: this.forms.rename.newName })
+                }).then(this.checkAuth);
+
+                this.showToast('Client renamed');
+                this.modals.rename = false;
                 this.loadData();
             } catch (err) {
-                this.showToast('Error deleting client', 'error');
+                try {
+                    const data = await err.json();
+                    this.showToast(data.description || 'Error renaming client', 'error');
+                } catch (e) {
+                    this.showToast('Error renaming client', 'error');
+                }
+            } finally {
+                this.loading.rename = false;
+            }
+        },
+
+        async executeDelete() {
+            this.loading.delete = true;
+            try {
+                if (this.pendingDelete.type === 'client') {
+                    await fetch(`/api/clients/${encodeURIComponent(this.pendingDelete.name)}`, { method: 'DELETE' }).then(this.checkAuth);
+                    this.showToast('Client deleted');
+                } else {
+                    const encodedPort = encodeURIComponent(this.pendingDelete.port);
+                    await fetch(`/api/forwardings/${encodedPort}/${this.pendingDelete.proto}`, { method: 'DELETE' }).then(this.checkAuth);
+                    this.showToast('Rule removed');
+                }
+                this.modals.confirmDelete = false;
+                this.modals.confirmDeleteFwd = false;
+                this.loadData();
+            } catch (err) {
+                this.showToast('Error deleting item', 'error');
+            } finally {
+                this.loading.delete = false;
             }
         },
 
         async createForwarding() {
+            this.loading.createFwd = true;
             try {
-                const res = await fetch('/api/forwardings', {
+                await fetch('/api/forwardings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(this.forms.fwd)
                 }).then(this.checkAuth);
 
-                this.showToast('Forwarding rule added! 🎉');
+                this.showToast('Forwarding rule added!');
                 this.modals.fwd = false;
                 this.loadData();
             } catch (err) {
@@ -199,20 +258,9 @@ function app() {
                 } catch (e) {
                     this.showToast('Error creating rule', 'error');
                 }
+            } finally {
+                this.loading.createFwd = false;
             }
         },
-
-        async deleteForwarding(port, proto) {
-            if (!confirm('Remove this forwarding rule?')) return;
-            try {
-                // Encode the slash in port ranges if present
-                const encodedPort = encodeURIComponent(port);
-                await fetch(`/api/forwardings/${encodedPort}/${proto}`, { method: 'DELETE' }).then(this.checkAuth);
-                this.showToast('Rule removed');
-                this.loadData();
-            } catch (err) {
-                this.showToast('Error removing rule', 'error');
-            }
-        }
     }
 }

@@ -1,158 +1,171 @@
-
-import os
-import time
 import ipaddress
 import logging
-from app.core.config import (
-    DATA_DIR, CLIENTS_DIR, CLIENTS_FILE, WG_CONFIG_PATH, WG_INTERFACE,
-    WG_PORT, WG_HOST, WG_NETWORK, WG_ADDRESS, DEFAULT_CLIENT_NAME
-)
-from app.core.utils import run, load_json, save_json
+import os
+import time
 
-def ensure_directories():
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    CLIENTS_DIR.mkdir(parents=True, exist_ok=True)
-    WG_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+from app.core.providers import CommandRunner, ConfigProvider, StorageBackend
 
-def ensure_server_keys():
-    priv_path = DATA_DIR / "server.privatekey"
-    pub_path = DATA_DIR / "server.publickey"
-    if not priv_path.exists():
-        priv = run(["wg", "genkey"]).stdout.strip()
-        pub = run(["wg", "pubkey"], input_data=f"{priv}\n").stdout.strip()
-        priv_path.write_text(priv + "\n")
-        pub_path.write_text(pub + "\n")
-        os.chmod(priv_path, 0o600)
-        os.chmod(pub_path, 0o600)
-    return priv_path.read_text().strip(), pub_path.read_text().strip()
 
-def generate_keypair():
-    priv = run(["wg", "genkey"]).stdout.strip()
-    pub = run(["wg", "pubkey"], input_data=f"{priv}\n").stdout.strip()
-    return priv, pub
+class WireGuardService:
+    def __init__(self, config: ConfigProvider, storage: StorageBackend, runner: CommandRunner):
+        self._config = config
+        self._storage = storage
+        self._runner = runner
 
-def load_clients():
-    raw = load_json(CLIENTS_FILE, [])
-    clients = []
-    for entry in raw:
-        try:
-            ipaddress.ip_address(entry["address"])
-            clients.append(entry)
-        except Exception:
-            continue
-    return clients
+    def ensure_dirs(self):
+        self._config.data_dir.mkdir(parents=True, exist_ok=True)
+        self._config.clients_dir.mkdir(parents=True, exist_ok=True)
+        self._config.wg_config_path.parent.mkdir(parents=True, exist_ok=True)
 
-def write_client_config(client, server_public):
-    cfg = "\n".join(
-        [
-            "[Interface]",
-            f"PrivateKey = {client['private_key']}",
-            f"Address = {client['address']}/{WG_NETWORK.prefixlen}",
-            "DNS = 1.1.1.1",
-            "",
-            "[Peer]",
-            f"PublicKey = {server_public}",
-            f"Endpoint = {WG_HOST}:{WG_PORT}",
-            "AllowedIPs = 0.0.0.0/0",
-            "PersistentKeepalive = 25",
-            "",
-        ]
-    )
-    path = CLIENTS_DIR / f"{client['name']}.conf"
-    path.write_text(cfg)
-    os.chmod(path, 0o600)
-    return path
+    def ensure_server_keys(self) -> tuple[str, str]:
+        priv_path = str(self._config.data_dir / "server.privatekey")
+        pub_path = str(self._config.data_dir / "server.publickey")
+        if not self._storage.exists(priv_path):
+            priv = self._runner.run(["wg", "genkey"]).stdout.strip()
+            pub = self._runner.run(["wg", "pubkey"], input_data=f"{priv}\n").stdout.strip()
+            self._storage.write_text(priv_path, priv + "\n")
+            self._storage.write_text(pub_path, pub + "\n")
+            try:
+                os.chmod(priv_path, 0o600)
+                os.chmod(pub_path, 0o600)
+            except OSError:
+                pass
+        priv_content = self._storage.read_text(priv_path) or ""
+        pub_content = self._storage.read_text(pub_path) or ""
+        return priv_content.strip(), pub_content.strip()
 
-def next_available_ip(clients):
-    used = {WG_ADDRESS.ip}
-    used.update(ipaddress.ip_address(c["address"]) for c in clients)
-    for host in WG_NETWORK.hosts():
-        if host not in used:
-            return host
-    raise RuntimeError("No free client addresses remain in the configured network.")
+    def generate_keypair(self) -> tuple[str, str]:
+        priv = self._runner.run(["wg", "genkey"]).stdout.strip()
+        pub = self._runner.run(["wg", "pubkey"], input_data=f"{priv}\n").stdout.strip()
+        return priv, pub
 
-def render_wireguard_config(clients, server_private):
-    lines = [
-        "[Interface]",
-        f"Address = {WG_ADDRESS}",
-        f"ListenPort = {WG_PORT}",
-        f"PrivateKey = {server_private}",
-        "SaveConfig = false",
-        "",
-    ]
-    for client in clients:
-        lines.extend(
+    def load_clients(self) -> list[dict]:
+        raw = self._storage.load_json(str(self._config.clients_file), [])
+        clients = []
+        for entry in raw:
+            try:
+                ipaddress.ip_address(entry["address"])
+                clients.append(entry)
+            except Exception:
+                continue
+        return clients
+
+    def write_client_config(self, client: dict, server_public: str):
+        cfg = "\n".join(
             [
+                "[Interface]",
+                f"PrivateKey = {client['private_key']}",
+                f"Address = {client['address']}/{self._config.wg_network.prefixlen}",
+                "DNS = 1.1.1.1",
+                "",
                 "[Peer]",
-                f"PublicKey = {client['public_key']}",
-                f"AllowedIPs = {client['address']}/32",
+                f"PublicKey = {server_public}",
+                f"Endpoint = {self._config.wg_host}:{self._config.wg_port}",
+                "AllowedIPs = 0.0.0.0/0",
+                "PersistentKeepalive = 25",
                 "",
             ]
         )
-    WG_CONFIG_PATH.write_text("\n".join(lines))
-    os.chmod(WG_CONFIG_PATH, 0o600)
-
-def log_wireguard_status():
-    status = run(["wg", "show"], check=False)
-    payload = status.stdout or status.stderr
-    if payload:
-        logging.info("WireGuard status:\n%s", payload.strip())
-
-def bounce_interface():
-    run(["wg-quick", "down", WG_INTERFACE], check=False)
-    run(["wg-quick", "up", WG_INTERFACE])
-    log_wireguard_status()
-
-def seamless_reload():
-    try:
-        stripped = run(["wg-quick", "strip", str(WG_CONFIG_PATH)]).stdout
-        run(["wg", "syncconf", WG_INTERFACE, "/dev/stdin"], input_data=stripped)
-        log_wireguard_status()
-    except Exception as e:
-        logging.warning("Seamless reload failed (%s), falling back to bounce", e)
-        bounce_interface()
-
-def refresh_wireguard(clients):
-    server_private, _ = ensure_server_keys()
-    render_wireguard_config(clients, server_private)
-    seamless_reload()
-    logging.info("Reloaded WireGuard with %s clients", len(clients))
-
-def peer_status_map():
-    status = {}
-    now = int(time.time())
-    
-    transfer = {}
-    res_transfer = run(["wg", "show", WG_INTERFACE, "transfer"], check=False)
-    if res_transfer.returncode == 0 and res_transfer.stdout:
-        for line in res_transfer.stdout.splitlines():
-            parts = line.split()
-            if len(parts) >= 3:
-                transfer[parts[0]] = {"rx": int(parts[1]), "tx": int(parts[2])}
-
-    res = run(["wg", "show", WG_INTERFACE, "latest-handshakes"], check=False)
-    if res.returncode != 0 or not res.stdout:
-        return status
-
-    for line in res.stdout.splitlines():
-        parts = line.split()
-        if len(parts) < 2:
-            continue
-        pubkey = parts[0]
-        ts_raw = parts[1]
+        path = str(self._config.clients_dir / f"{client['name']}.conf")
+        self._storage.write_text(path, cfg)
         try:
-            ts = int(ts_raw)
-        except ValueError:
-            ts = 0
-        online = ts > 0 and (now - ts) < 180
-        
-        t_stats = transfer.get(pubkey, {"rx": 0, "tx": 0})
-        
-        status[pubkey] = {
-            "handshake": ts, 
-            "online": online, 
-            "age": now - ts if ts else None,
-            "rx_bytes": t_stats["rx"],
-            "tx_bytes": t_stats["tx"]
-        }
-    return status
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+        return path
+
+    def next_available_ip(self, clients: list[dict]) -> ipaddress.IPv4Address:
+        used = {self._config.wg_address.ip}
+        used.update(ipaddress.ip_address(c["address"]) for c in clients)
+        for host in self._config.wg_network.hosts():
+            if host not in used:
+                return host
+        raise RuntimeError("No free client addresses remain in the configured network.")
+
+    def render_wireguard_config(self, clients: list[dict], server_private: str):
+        lines = [
+            "[Interface]",
+            f"Address = {self._config.wg_address}",
+            f"ListenPort = {self._config.wg_port}",
+            f"PrivateKey = {server_private}",
+            "SaveConfig = false",
+            "",
+        ]
+        for client in clients:
+            lines.extend(
+                [
+                    "[Peer]",
+                    f"PublicKey = {client['public_key']}",
+                    f"AllowedIPs = {client['address']}/32",
+                    "",
+                ]
+            )
+        path = str(self._config.wg_config_path)
+        self._storage.write_text(path, "\n".join(lines))
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+
+    def log_wireguard_status(self):
+        status = self._runner.run(["wg", "show"], check=False)
+        payload = status.stdout or status.stderr
+        if payload:
+            logging.info("WireGuard status:\n%s", payload.strip())
+
+    def bounce_interface(self):
+        self._runner.run(["wg-quick", "down", self._config.wg_interface], check=False)
+        self._runner.run(["wg-quick", "up", self._config.wg_interface])
+        self.log_wireguard_status()
+
+    def seamless_reload(self):
+        try:
+            stripped = self._runner.run(["wg-quick", "strip", str(self._config.wg_config_path)]).stdout
+            self._runner.run(["wg", "syncconf", self._config.wg_interface, "/dev/stdin"], input_data=stripped)
+            self.log_wireguard_status()
+        except Exception as e:
+            logging.warning("Seamless reload failed (%s), falling back to bounce", e)
+            self.bounce_interface()
+
+    def refresh_wireguard(self, clients: list[dict]):
+        server_private, _ = self.ensure_server_keys()
+        self.render_wireguard_config(clients, server_private)
+        self.seamless_reload()
+        logging.info("Reloaded WireGuard with %s clients", len(clients))
+
+    def peer_status_map(self) -> dict:
+        status = {}
+        now = int(time.time())
+
+        transfer = {}
+        res_transfer = self._runner.run(["wg", "show", self._config.wg_interface, "transfer"], check=False)
+        if res_transfer.returncode == 0 and res_transfer.stdout:
+            for line in res_transfer.stdout.splitlines():
+                parts = line.split()
+                if len(parts) >= 3:
+                    transfer[parts[0]] = {"rx": int(parts[1]), "tx": int(parts[2])}
+
+        res = self._runner.run(["wg", "show", self._config.wg_interface, "latest-handshakes"], check=False)
+        if res.returncode != 0 or not res.stdout:
+            return status
+
+        for line in res.stdout.splitlines():
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            pubkey = parts[0]
+            ts_raw = parts[1]
+            try:
+                ts = int(ts_raw)
+            except ValueError:
+                ts = 0
+            online = ts > 0 and (now - ts) < 180
+            t_stats = transfer.get(pubkey, {"rx": 0, "tx": 0})
+            status[pubkey] = {
+                "handshake": ts,
+                "online": online,
+                "age": now - ts if ts else None,
+                "rx_bytes": t_stats["rx"],
+                "tx_bytes": t_stats["tx"],
+            }
+        return status

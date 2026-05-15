@@ -1,0 +1,28 @@
+[project]
+name = "portbridge"
+description = "WireGuard VPN manager with dynamic port forwarding web UI"
+requires-python = ">=3.10"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"app/routes/api.py" = ["N806"]
+"__init__.py" = ["N806"]
+
+

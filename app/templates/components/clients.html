@@ -35,8 +35,7 @@
                             <span x-text="client.name.substring(0, 2)"></span>
                         </div>
                         <div>
-                            <h3 class="font-bold text-slate-900 dark:text-white" x-text="client.name">
-                            </h3>
+                            <h3 class="font-bold text-slate-900 dark:text-white" x-text="client.name"></h3>
                             <div class="flex items-center gap-1.5 mt-0.5">
                                 <span class="w-2 h-2 rounded-full"
                                     :class="client.online ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'"></span>
@@ -54,15 +53,14 @@
                             class="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-surface rounded-xl shadow-xl border border-gray-100 dark:border-dark-border py-1 z-10"
                             x-cloak>
                             <a :href="client.config"
-                                class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Download
-                                Config</a>
-                            <button @click="showQR(client)"
-                                class="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Show
-                                QR Code</button>
+                                class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Download Config</a>
+                            <button @click="showQR(client); open = false"
+                                class="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Show QR Code</button>
+                            <button @click="openRenameModal(client); open = false"
+                                class="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Rename</button>
                             <div class="h-px bg-gray-100 dark:bg-dark-border my-1"></div>
-                            <button @click="deleteClient(client.name)"
-                                class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">Delete
-                                Client</button>
+                            <button @click="confirmDeleteClient(client.name); open = false"
+                                class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">Delete Client</button>
                         </div>
                     </div>
                 </div>
@@ -73,10 +71,13 @@
                         <span class="font-mono font-medium text-slate-700 dark:text-slate-300"
                             x-text="client.address"></span>
                     </div>
-                    <span class="font-medium text-slate-700 dark:text-slate-300"
-                        x-text="formatTime(client.last_handshake)"></span>
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-slate-500 dark:text-slate-400">Last Handshake</span>
+                        <span class="font-medium text-slate-700 dark:text-slate-300"
+                            x-text="formatTime(client.last_handshake)"></span>
+                    </div>
                 </div>
-                <div class="flex items-center justify-between text-sm">
+                <div class="flex items-center justify-between text-sm mt-3">
                     <span class="text-slate-500 dark:text-slate-400">Data Usage</span>
                     <div class="flex items-center gap-2 font-mono text-xs">
                         <span class="text-slate-600 dark:text-slate-400 flex items-center" title="Upload">
@@ -89,36 +90,33 @@
                         </span>
                     </div>
                 </div>
-            </div>
 
-            <div class="mt-5 pt-4 border-t border-gray-100 dark:border-dark-border">
-                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    Active Forwards</div>
-                <div class="flex flex-wrap gap-2">
-                    <template x-for="fwd in client.forwardings" :key="fwd.port + fwd.protocol">
-                        <span
-                            class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800">
-                            <span x-text="fwd.port"></span>
-                            <span class="mx-1">→</span>
-                            <span x-text="fwd.target_port || fwd.port"></span>
-                            <span class="ml-1 opacity-75" x-text="'(' + fwd.protocol.toUpperCase() + ')'"></span>
-                        </span>
-                    </template>
-                    <span x-show="!client.forwardings || client.forwardings.length === 0"
-                        class="text-xs text-slate-400 italic">No active rules</span>
+                <div class="mt-5 pt-4 border-t border-gray-100 dark:border-dark-border">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Active Forwards</div>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="fwd in client.forwardings" :key="fwd.port + fwd.protocol">
+                            <span
+                                class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800">
+                                <span x-text="fwd.port"></span>
+                                <span class="mx-1">→</span>
+                                <span x-text="fwd.target_port || fwd.port"></span>
+                                <span class="ml-1 opacity-75" x-text="'(' + fwd.protocol.toUpperCase() + ')'"></span>
+                            </span>
+                        </template>
+                        <span x-show="!client.forwardings || client.forwardings.length === 0"
+                            class="text-xs text-slate-400 italic">No active rules</span>
+                    </div>
                 </div>
             </div>
+        </template>
     </div>
-    </template>
-</div>
 
-<!-- Empty State -->
-<div x-show="filteredClients.length === 0" class="col-span-full py-12 text-center">
-    <div class="w-16 h-16 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-        <span class="material-symbols-rounded text-3xl text-slate-400">search_off</span>
+    <!-- Empty State -->
+    <div x-show="filteredClients.length === 0" class="col-span-full py-12 text-center">
+        <div class="w-16 h-16 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span class="material-symbols-rounded text-3xl text-slate-400">search_off</span>
+        </div>
+        <h3 class="text-lg font-medium text-slate-900 dark:text-white">No clients found</h3>
+        <p class="text-slate-500 dark:text-slate-400">Try adjusting your search or add a new client.</p>
     </div>
-    <h3 class="text-lg font-medium text-slate-900 dark:text-white">No clients found</h3>
-    <p class="text-slate-500 dark:text-slate-400">Try adjusting your search or add a new client.
-    </p>
-</div>
 </div>
