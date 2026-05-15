@@ -41,3 +41,4 @@ docker-compose.override.yml
 # Project specific
 data/
 *.log
+skills-lock.json

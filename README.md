@@ -3,188 +3,191 @@
 
   # PortBridge
 
-A professional, lightweight, and user-friendly solution for managing WireGuard peers and port forwarding rules. Designed to easily expose services running behind NAT (like home routers or private networks) through a public VPS, without needing a public IP at the source.
+  Self-hosted WireGuard VPN manager with a dynamic port forwarding web UI.
+  Expose services behind NAT/CGNAT without a public IP.
 
   <div>
-    <a href="https://hub.docker.com/r/lahiru98s/portbridge "><img src="https://img.shields.io/docker/pulls/lahiru98s/portbridge .svg" alt="Docker UI pulls" /></a>
-    <a href="https://github.com/nooblk-98/lighthouse/releases"><img src="https://img.shields.io/github/v/release/nooblk-98/lighthouse?logo=github" alt="Latest release" /></a>
-    <a href="https://github.com/nooblk-98/lighthouse/actions/workflows/docker-build-push.yml"><img src="https://github.com/nooblk-98/lighthouse/actions/workflows/docker-build-push.yml/badge.svg" alt="CI" /></a>
-     <a href="https://creativecommons.org/licenses/by-nc/2.0/">
-    <img src="https://img.shields.io/badge/License-CC%20BY--NC%202.0-blue.svg" alt="License: CC BY-NC 2.0" />
+    <a href="https://hub.docker.com/r/lahiru98s/portbridge"><img src="https://img.shields.io/docker/pulls/lahiru98s/portbridge?style=flat-square" alt="Docker pulls" /></a>
+    <a href="https://github.com/nooblk-98/portbridge/releases"><img src="https://img.shields.io/github/v/release/nooblk-98/portbridge?style=flat-square&logo=github" alt="GitHub release" /></a>
+    <a href="https://github.com/nooblk-98/portbridge/actions/workflows/publish.yml"><img src="https://github.com/nooblk-98/portbridge/actions/workflows/publish.yml/badge.svg?style=flat-square" alt="CI status" /></a>
+    <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
   </div>
+
+  ⭐ If you like this project, star it on GitHub — it helps a lot!
+
+  [Overview](#overview) • [How it works](#how-it-works) • [Features](#features) • [Getting started](#getting-started) • [Usage](#usage) • [Configuration](#configuration) • [Screenshots](#screenshots)
+
 </div>
 
----
+## Overview
 
-![Dashboard Screenshot](images/dashboard.png)
+PortBridge is a lightweight, Docker-based tool that lets you expose services running on devices behind NAT, CGNAT, Starlink, or dynamic residential IPs through a public VPS. It combines a WireGuard VPN server with an iptables-based port forwarder, all managed through a clean web UI.
 
-## 🚀 Key Features
+> [!TIP]
+> No static public IP needed on the client side. As long as your device can initiate outbound connections, PortBridge can make its services reachable.
 
-*   **Easy Peer Management**: Create, delete, and manage WireGuard clients with a few clicks.
-*   **QR Code Support**: Instantly generate QR codes for mobile client configuration.
-*   **Dynamic Port Forwarding**: Forward TCP/UDP ports from your public server to any connected client.
-*   **Port Range Support**: Forward entire ranges of ports (e.g., `8000-8100`) for games and complex apps.
-*   **Source IP Whitelisting**: Restrict access to forwarded ports to specific IP addresses for enhanced security.
-*   **Real-time Monitoring**: View client online status, handshake times, and **bandwidth usage (RX/TX)**.
-*   **Secure Dashboard**: Built-in authentication to protect your management UI.
-*   **Dark Mode**: Fully supported dark theme for comfortable viewing.
-*   **Dockerized**: Runs in a lightweight Alpine container with minimal dependencies.
+## How it works
 
----
-
-## 🏗️ Architecture & How It Works
-
-This application solves the problem of accessing services hosted on networks without a public IP (e.g., Starlink, CGNAT, or dynamic residential IPs).
-
-### The Concept
-You run this application on a **VPS** (Virtual Private Server) that has a Public IP. Your home devices (Clients) connect to this VPS via a WireGuard tunnel. The VPS then acts as a gateway, forwarding traffic from specific public ports through the tunnel to your home devices.
-
-### Traffic Flow Diagram
+You run PortBridge on a VPS with a public IP. Client devices connect to it over a WireGuard tunnel. PortBridge forwards traffic from public ports on the VPS through the tunnel to specific services on those devices.
 
 ```mermaid
 graph LR
-    User[External User] -- "Public IP:20000" --> VPS["VPS (WG Server)"]
+    User[External User] -- "Public IP:20000" --> VPS["VPS (PortBridge)"]
     subgraph "WireGuard Tunnel"
     VPS -- "10.8.0.1 <--> 10.8.0.2" --> Client["Home Server/PC"]
     end
     Client -- "Localhost:80" --> Service["Web Service"]
-    
-    style VPS fill:#f9f,stroke:#333,stroke-width:2px
-    style Client fill:#bbf,stroke:#333,stroke-width:2px
 ```
-
-### Connection Sequence
 
 ```mermaid
 sequenceDiagram
     participant User as External User
-    participant Server as "VPS (Public IP)"
-    participant Client as "Home Device (No Public IP)"
-    
-    Note over Client, Server: 1. Client establishes WG Tunnel
-    Client->>Server: Handshake (Keep-alive)
-    
-    Note over User, Server: 2. User accesses Service
-    User->>Server: Connect to PublicIP:Port
-    Server->>Server: IPTables DNAT (Forward to Client WG IP)
-    Server->>Client: Traffic via Tunnel
+    participant Server as VPS (Public IP)
+    participant Client as Home Device (No Public IP)
+
+    Note over Client, Server: 1. Client establishes WireGuard tunnel
+    Client->>Server: Handshake (PersistentKeepalive=25s)
+
+    Note over User, Server: 2. User accesses the service
+    User->>Server: Connect to VPS Public IP:Port
+    Server->>Server: iptables DNAT → Client WG IP
+    Server->>Client: Forward traffic via tunnel
     Client->>Client: Service processes request
-    Client->>Server: Response via Tunnel
-    Server->>User: Response to User
+    Client->>Server: Response via tunnel
+    Server->>User: Response to user
 ```
 
----
+## Features
 
-## 🛠️ Deployment Guide
+- **WireGuard peer management** — Full CRUD for clients via a clean web UI with online/offline status, handshake times, and bandwidth usage (RX/TX).
+- **Dynamic port forwarding** — Forward any TCP/UDP port from the VPS to connected clients. Changes apply in real time via iptables without restarting WireGuard.
+- **Port range support** — Forward entire ranges (e.g., `8000-8100`) for gaming servers or multi-port applications.
+- **Source IP whitelisting** — Restrict access to forwarded ports by source IP or CIDR for enhanced security.
+- **QR code provisioning** — One-click QR code generation for mobile WireGuard client setup.
+- **Seamless peer reload** — Uses `wg syncconf` for hot-reloading peers without disconnecting existing clients (falls back to `wg-quick` bounce if needed).
+- **Dark mode** — Full dark theme persisted to local storage.
+- **Lightweight & Dockerized** — Alpine-based container (~300 MB), minimal Python dependencies (Flask + 3 libraries).
+- **Multi-arch images** — Published for both `linux/amd64` and `linux/arm64` on Docker Hub and GitHub Container Registry.
+
+## Getting started
 
 ### Prerequisites
-*   A VPS with a Public IP (Ubuntu/Debian recommended).
-*   Docker and Docker Compose installed.
-*   Root access (required for managing network interfaces).
 
-### Quick Start
+- A VPS with a public IP (Ubuntu/Debian recommended)
+- Docker and Docker Compose installed
+- Root access (required for `NET_ADMIN`, `SYS_MODULE` capabilities, and `iptables`)
 
-**One-Line Deployment:**
+### Quick deploy
+
 ```bash
-wget -O docker-compose.yml https://raw.githubusercontent.com/nooblk-98/lighthouse/refs/heads/main/docker-compose.live.yml && docker compose up -d
+wget -O docker-compose.yml https://raw.githubusercontent.com/nooblk-98/portbridge/refs/heads/main/docker-compose.live.yml && docker compose up -d
 ```
 
-### Manual Configuration
+### Manual setup
 
-1.  **Configure Environment**:
-    Create a `.env` file or modify `docker-compose.yml`:
-    ```yaml
+Create a `docker-compose.yml`:
+
+```yaml
+services:
+  portbridge:
+    image: lahiru98s/portbridge:latest
+    container_name: portbridge
     environment:
-      - WG_HOST=your.public.ip.address  # IMPORTANT: Your VPS Public IP
-      - ADMIN_PASSWORD=secure_password   # Dashboard Login Password (Default: admin)
-    ```
+      WG_HOST: 203.0.113.10         # Required: your VPS public IP
+      ADMIN_PASSWORD: changeme       # Required: web UI password
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    ports:
+      - "51820:51820/udp"          # WireGuard
+      - "3000:3000/tcp"            # Web UI
+      - "30000-30100:30000-30100/tcp"  # Port forwarding range (optional)
+    volumes:
+      - wg-data:/data
+      - /lib/modules:/lib/modules:ro
+    restart: unless-stopped
 
-2.  **Run the Container**:
-    ```bash
-    docker-compose up -d --build
-    ```
+volumes:
+  wg-data:
+```
 
----
+Then start the container:
 
-## 💻 Client Connection Guide
+```bash
+docker compose up -d
+```
 
-How to connect your home server or router to the VPS to expose ports.
+> [!IMPORTANT]
+> You must set `WG_HOST` to your VPS public IP address for clients to connect. The default `ADMIN_PASSWORD` is `admin` — change it in production.
 
-### Step 1: Create a Client
-1.  Open the Web UI (`http://<your-vps-ip>:3000`).
-2.  Go to the **Clients** tab.
-3.  Click **"New Client"**.
-4.  Enter a name (e.g., `Home-Server`) and click **Create**.
+## Usage
 
-### Step 2: Configure the Client Device
-1.  **Download Config**: Click the "Download Config" option on the client card to get the `.conf` file.
-2.  **Install WireGuard**:
-    *   **Linux**: `sudo apt install wireguard`
-    *   **Windows/Mac**: Download the official WireGuard client.
-3.  **Apply Config**:
-    *   **Linux**: Copy the file to `/etc/wireguard/wg0.conf` and run `wg-quick up wg0`.
-    *   **GUI Apps**: Import the `.conf` file or scan the QR code.
+### 1. Create a client
 
-### Step 3: Verify Connection
-Check the Web UI. The client status should turn **Online** (Green) within a few seconds of connecting.
+1. Open the web UI at `http://<vps-ip>:3000` and log in.
+2. Go to the **Clients** tab and click **New Client**.
+3. Enter a name (e.g., `home-server`) and click **Create**.
 
----
+### 2. Configure the client device
 
-## 🔗 Port Forwarding (The Magic)
+1. Click the download icon on the client card to get the `.conf` file, or view the QR code for mobile setup.
+2. Import the config into the [WireGuard client](https://www.wireguard.com/install/) on your device.
+3. On Linux: copy the file to `/etc/wireguard/wg0.conf` and run `wg-quick up wg0`.
 
-Now that your client is connected, let's expose a service (e.g., a Minecraft server or Web App) running on your home machine.
+### 3. Add a port forwarding rule
 
-1.  **Identify the Service**:
-    *   Let's say your Home Server runs a web app on port `8080`.
-2.  **Open a Port**:
-    *   Go to the **Forwarding** tab in the Web UI.
-    *   Click **"New Rule"**.
-    *   **Public Port**: `30000` (or a range `30000-30100`).
-    *   **Internal Port**: `8080` (The port your service is running on).
-    *   **Protocol**: `TCP` (or UDP/Both depending on the service).
-    *   **Target Client**: Select `Home-Server`.
-    *   **Source IP (Optional)**: Enter an IP `1.2.3.4` to only allow connections from that IP.
-    *   Click **Add Rule**.
-3.  **Access**:
-    *   Anyone can now access your home web app via `http://<VPS-Public-IP>:30000`.
+1. Go to the **Forwarding** tab and click **New Rule**.
+2. Specify:
+   - **Public port** — the port on your VPS (single port or range, e.g., `30000` or `30000-30100`)
+   - **Internal port** — the port your service runs on (e.g., `8080`)
+   - **Protocol** — `TCP`, `UDP`, or `Both`
+   - **Target client** — select the client from the dropdown
+   - **Source IP** (optional) — restrict access to a specific IP or CIDR
+3. Click **Add Rule**.
 
----
+Your service is now accessible at `http://<vps-ip>:30000`.
 
-## 📸 UI Gallery
+## Configuration
+
+All configuration is done through environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `WG_HOST` | `127.0.0.1` | VPS public IP or hostname (required) |
+| `WG_PORT` | `51820` | WireGuard listening UDP port |
+| `WG_NETWORK` | `10.8.0.0/24` | WireGuard tunnel subnet |
+| `WG_ADDRESS` | `10.8.0.1/24` | Server address within the tunnel |
+| `WG_INTERFACE` | `wg0` | WireGuard interface name |
+| `APP_PORT` | `3000` | Web UI port |
+| `ADMIN_PASSWORD` | `admin` | Dashboard login password |
+| `DATA_DIR` | `/data` | Persistent data directory |
+
+## Screenshots
 
 <p align="center">
   <img src="images/dashboard.png" alt="Dashboard" width="90%" />
+  <br/>
+  <em>Dashboard overview</em>
 </p>
-<p align="center">
-  <em>Dashboard Overview</em>
-</p>
-<br/>
 
 <p align="center">
-  <img src="images/clients.png" alt="Client Management" width="90%" />
+  <img src="images/clients.png" alt="Client management" width="90%" />
+  <br/>
+  <em>Client management with online status and bandwidth</em>
 </p>
-<p align="center">
-  <em>Client Management</em>
-</p>
-<br/>
 
 <p align="center">
-  <img src="images/forwarding.png" alt="Port Forwarding" width="90%" />
+  <img src="images/forwarding.png" alt="Port forwarding" width="90%" />
+  <br/>
+  <em>Port forwarding rules management</em>
 </p>
-<p align="center">
-  <em>Port Forwarding Rules</em>
-</p>
----
 
-## 🛡️ Security Notes
+## Security notes
 
-*   **Firewall**: The application manages `iptables` for forwarding, but ensure your VPS firewall (UFW/Security Groups) allows the ports you want to expose (e.g., 20000, 25565).
-*   **Web UI Access**: The Web UI runs on port `3000`. It is protected by a login page (configure `ADMIN_PASSWORD` in docker-compose).
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- The web UI is protected by a login page. Change the default `admin` password.
+- PortBridge uses custom `iptables` chains (`WG_FORWARDER`) that are isolated from your system rules.
+- The WireGuard port (`51820`) and web UI port (`3000`) are reserved and cannot be forwarded through the UI.
+- Ensure your VPS firewall (UFW / cloud security groups) allows the ports you intend to expose.
