@@ -12,7 +12,7 @@ cd portbridge
 sudo bash install.sh vpn.example.com
 ```
 
-The installer prompts for the dashboard password and starts the `portbridge` service. It uses the `pb0` WireGuard interface and keeps peer data in `/var/lib/portbridge`. The dashboard listens on localhost. Open an SSH tunnel from your computer, then visit <http://localhost:3000>.
+The installer is for fresh installations and prompts for a dashboard password of 16–128 letters or numbers. It starts the `portbridge` service. It uses the `pb0` WireGuard interface and keeps peer data in `/var/lib/portbridge`. The dashboard listens on localhost. Open an SSH tunnel from your computer, then visit <http://localhost:3000>.
 
 ```sh
 ssh -N -L 3000:127.0.0.1:3000 user@vpn.example.com
@@ -35,12 +35,16 @@ A device can offer services on its own WireGuard IP. Make sure those services li
 3. If the destination is behind the advertising device, enable IP forwarding on that device, allow forwarding in its firewall, and add a return route to the WireGuard subnet through that device (or configure source NAT there).
 4. For receiving peers using **Split tunnel**, re-import their updated configuration so the new destination is routed over WireGuard. Then connect to the destination IP and its normal service port.
 
-Advertised routes must be distinct and must not overlap the VPN subnet. Clearing the route list withdraws the advertisement. Route changes briefly reconnect the server tunnel. PortBridge distributes route changes through updated WireGuard profiles. You can also set DNS, MTU and persistent keepalive per peer. Re-import the relevant profile after changing those options.
+You can advertise private IPv4 ranges and the shared address block `100.64.0.0/10`. Advertised routes must be distinct and cannot overlap the VPN subnet or existing server routes. Clearing the route list withdraws the advertisement. Route changes briefly reconnect the server tunnel. PortBridge distributes route changes through updated WireGuard profiles. You can also set DNS, MTU and persistent keepalive per peer. Re-import the relevant profile after changing those options.
 
 ## Publish a specific service
 
-Open **Forwarding**, create a rule, and select a public port, protocol, target peer and service port. Set a source IP or CIDR to restrict access when needed. Allow the public port through the server and provider firewalls. For Docker, publish the same port and protocol in Compose.
+Open **Forwarding**, create a rule, and select a public port, protocol, target peer and service port. Set a source IP or CIDR to restrict access when needed. The service sees the VPN server’s address as the connection source. Allow the public port through the server and provider firewalls. For Docker, publish the same port and protocol in Compose.
 
 ## Existing Docker installations
 
-The [Compose example](docker-compose-live.yml) uses the published image. Set `WG_HOST` and a strong `ADMIN_PASSWORD` before starting it. Existing Docker volumes contain your peer keys and rules. Keep the volume when upgrading. Features documented here require an image built from a version that includes them.
+The [Compose example](docker-compose-live.yml) uses the published image. On upgrade, set `WG_HOST` and a strong `ADMIN_PASSWORD` in your Compose environment. Both Compose examples now bind the dashboard to localhost. Use the SSH tunnel above to reach a remote dashboard. Existing Docker volumes contain your peer keys and rules. Keep the volume when upgrading. Features documented here require an image built from a version that includes them.
+
+## Internet access through the VPN
+
+The server blocks general peer internet access by default. For devices that only need VPN services, enable split tunneling. To use the server as an internet gateway, set `ALLOW_INTERNET_EGRESS=1` in `/etc/portbridge/portbridge.env` (or in the Compose service environment) and restart PortBridge. Devices with full-tunnel profiles then send their IPv4 internet traffic through the server.

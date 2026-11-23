@@ -1,7 +1,11 @@
+import ipaddress
+import json
 import logging
+import os
+import re
 from threading import RLock
 
-from app.core.peer_options import peer_options
+from app.core.peer_options import PRIVATE_ROUTES, peer_options
 from app.core.providers import CommandRunner, ConfigProvider, StorageBackend
 from app.core.rule_renderer import protocols_overlap, render_rule
 
@@ -12,8 +16,6 @@ class IPTablesService:
         self._storage = storage
         self._runner = runner
         self._lock = RLock()
-        self._nat_tmp = config.nat_chain + "_TMP"
-        self._filter_tmp = config.filter_chain + "_TMP"
 
     def detect_primary_interface(self) -> str:
         try:
@@ -25,68 +27,97 @@ class IPTablesService:
             return "eth0"
         return "eth0"
 
-    def _ensure_masquerade(self, ext_iface: str):
-        check = self._runner.run(
-            ["iptables", "-t", "nat", "-C", "POSTROUTING", "-s", str(self._config.wg_network), "-o", ext_iface, "-j", "MASQUERADE"],
-            check=False,
-        )
-        if check.returncode != 0:
-            self._runner.run(["iptables", "-t", "nat", "-A", "POSTROUTING", "-s", str(self._config.wg_network), "-o", ext_iface, "-j", "MASQUERADE"])
+    def _install_chain(self, table, chain, parent, rules):
+        command = ["iptables", "-w", "-t", table]
+        # Restore replaces the entire managed chain in one table transaction.
+        entries = [f"*{table}", f":{chain} - [0:0]", f"-F {chain}"]
+        if any(not re.fullmatch(r"[A-Za-z0-9_.:/,-]+", arg) for rule in rules for arg in rule):
+            raise ValueError("Invalid firewall rule argument.")
+        entries.extend(f"-A {chain} " + " ".join(rule) for rule in rules)
+        jump = f"-j {chain}"
+        present = self._runner.run(command + ["-C", parent, "-j", chain], check=False).returncode == 0
+        if present and table == "filter":
+            entries.append(f"-D {parent} {jump}")
+        if not present or table == "filter":
+            entries.append(f"-I {parent} 1 {jump}")
+        self._runner.run(["iptables-restore", "-w", "--noflush"], input_data="\n".join([*entries, "COMMIT", ""]))
 
-    def _ensure_chain(self, table: str, chain: str):
-        self._runner.run(["iptables", "-t", table, "-N", chain], check=False)
-
-    def _chain_args(self, action: str, chain: str, cmd: list) -> list:
-        args = [action, chain] + cmd[1:]
-        return args
-
-    def _build_rules_into_tmp(self, rules: list[dict], ext_iface: str):
-        self._ensure_chain("nat", self._nat_tmp)
-        self._ensure_chain("filter", self._filter_tmp)
-        self._runner.run(["iptables", "-t", "nat", "-F", self._nat_tmp])
-        self._runner.run(["iptables", "-t", "filter", "-F", self._filter_tmp])
-
-        for rule in rules:
-            commands = render_rule(rule, ext_iface)
-            for cmd in commands:
-                chain = self._nat_tmp if cmd.table == "nat" else self._filter_tmp
-                self._runner.run(["iptables", "-t", cmd.table, "-A", chain] + cmd.args)
-
+    def _routing_rules(self, ext_iface):
         interface = self._config.wg_interface
+        network = str(self._config.wg_network)
+        same_tunnel = ["-i", interface, "-o", interface]
+        established = ["-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED"]
+        rules = [same_tunnel + ["-s", network, "-d", network, "-j", "ACCEPT"]]
         clients = self._storage.load_json(str(self._config.clients_file), [])
         for peer in clients:
             for route in peer_options(peer)["advertised_routes"]:
-                base = ["iptables", "-t", "filter", "-A", self._filter_tmp,
-                        "-i", interface, "-o", interface]
-                network = str(self._config.wg_network)
-                self._runner.run(base + ["-s", network, "-d", route, "-j", "ACCEPT"])
-                self._runner.run(base + ["-s", route, "-d", network, "-m", "conntrack",
-                                         "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"])
+                rules.append(same_tunnel + ["-s", network, "-d", route, "-j", "ACCEPT"])
+                rules.append(same_tunnel + ["-s", route, "-d", network, *established, "-j", "ACCEPT"])
+        if os.environ.get("ALLOW_INTERNET_EGRESS") == "1":
+            for destination in (*PRIVATE_ROUTES, *self._external_connected_routes(ext_iface)):
+                rules.append(["-i", interface, "-o", ext_iface, "-d", str(destination), "-j", "DROP"])
+            rules.append(["-i", interface, "-o", ext_iface, "-s", network, "-j", "ACCEPT"])
+            rules.append(["-i", ext_iface, "-o", interface, "-d", network, *established, "-j", "ACCEPT"])
+        return rules
 
-    def _swap_chain(self, table: str, live_chain: str, tmp_chain: str, parent_chain: str):
-        self._ensure_chain(table, live_chain)
-        present = self._runner.run(["iptables", "-t", table, "-C", parent_chain, "-j", live_chain], check=False)
-        if present.returncode != 0:
-            self._runner.run(["iptables", "-t", table, "-A", parent_chain, "-j", live_chain])
-
-        self._runner.run(["iptables", "-t", table, "-F", live_chain])
-
-        res = self._runner.run(["iptables", "-t", table, "-S", tmp_chain], check=False)
-        for line in (res.stdout or "").splitlines():
-            if line.startswith(f"-A {tmp_chain}"):
-                new_rule = line.replace(f"-A {tmp_chain}", f"-A {live_chain}", 1)
-                self._runner.run(["iptables", "-t", table] + new_rule.split())
-
-        self._runner.run(["iptables", "-t", table, "-F", tmp_chain], check=False)
-        self._runner.run(["iptables", "-t", table, "-X", tmp_chain], check=False)
+    def _external_connected_routes(self, interface):
+        result = self._runner.run(["ip", "-j", "-4", "route", "show", "dev", interface])
+        return [
+            ipaddress.IPv4Network(entry["dst"])
+            for entry in json.loads(result.stdout)
+            if entry.get("dst") not in (None, "default")
+        ]
 
     def apply_forwardings(self, rules: list[dict]):
         with self._lock:
             ext_iface = self.detect_primary_interface()
-            self._build_rules_into_tmp(rules, ext_iface)
-            self._swap_chain("nat", self._config.nat_chain, self._nat_tmp, "PREROUTING")
-            self._swap_chain("filter", self._config.filter_chain, self._filter_tmp, "FORWARD")
-            self._ensure_masquerade(ext_iface)
+            interface = self._config.wg_interface
+            network = str(self._config.wg_network)
+            commands = [command for rule in rules for command in render_rule(rule, ext_iface)]
+            dnat = [command.args for command in commands if command.table == "nat"]
+            public = [
+                ["-i", ext_iface, "-o", interface, "-m", "conntrack", "--ctstate", "DNAT", *command.args]
+                for command in commands
+                if command.table == "filter"
+            ]
+            if public:
+                public.append(
+                    [
+                        "-i",
+                        interface,
+                        "-o",
+                        ext_iface,
+                        "-s",
+                        network,
+                        "-m",
+                        "conntrack",
+                        "--ctstate",
+                        "DNAT",
+                        "--ctdir",
+                        "REPLY",
+                        "-j",
+                        "ACCEPT",
+                    ]
+                )
+            policy = [
+                *public,
+                *self._routing_rules(ext_iface),
+                ["-i", interface, "-j", "DROP"],
+                ["-o", interface, "-j", "DROP"],
+            ]
+            # Move an existing unconditional hook to the front atomically on upgrade.
+            chain = self._config.filter_chain
+            parent = "FORWARD"
+            self._install_chain("filter", chain, parent, policy)
+            self._install_chain("nat", self._config.nat_chain, "PREROUTING", dnat)
+            masquerade = (
+                [["-o", interface, "-m", "conntrack", "--ctstate", "DNAT", "--ctdir", "ORIGINAL", "-j", "MASQUERADE"]]
+                if public
+                else []
+            )
+            if os.environ.get("ALLOW_INTERNET_EGRESS") == "1":
+                masquerade.append(["-s", network, "-o", ext_iface, "-j", "MASQUERADE"])
+            self._install_chain("nat", self._config.nat_chain + "_POST", "POSTROUTING", masquerade)
             logging.info("Applied %s forwarding rules", len(rules))
 
     def load_forwardings(self, default_client_ip: str | None = None) -> list[dict]:

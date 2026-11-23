@@ -181,7 +181,7 @@ function app() {
                 this.showToast('Peer settings saved. Download the updated profile.');
                 await this.loadData();
             } catch (error) {
-                const details = await error.json?.().catch(() => null);
+                const details = error instanceof Response ? await error.json().catch(() => null) : null;
                 this.showToast(details?.description || 'Could not save peer settings', 'error');
             } finally {
                 this.loading.options = false;

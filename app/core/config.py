@@ -15,6 +15,8 @@ class EnvConfigProvider(ConfigProvider):
         self._forward_file = Path(os.environ.get("FORWARD_CONFIG", str(self._data_dir / "forwardings.json")))
         self._wg_config_path = Path(os.environ.get("WG_CONFIG_PATH", "/etc/wireguard/wg0.conf"))
         self._wg_interface = os.environ.get("WG_INTERFACE", "wg0")
+        if self._wg_config_path.name != f"{self._wg_interface}.conf":
+            raise ValueError("WG_CONFIG_PATH filename must match WG_INTERFACE.")
         self._wg_port = int(os.environ.get("WG_PORT", "51820"))
         self._wg_host = os.environ.get("WG_HOST", "127.0.0.1")
         self._app_port = int(os.environ.get("APP_PORT", "3000"))

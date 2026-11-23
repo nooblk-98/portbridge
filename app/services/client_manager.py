@@ -133,26 +133,41 @@ class ClientManager:
         routes_changed = settings["advertised_routes"] != peer_options(target)["advertised_routes"]
         if routes_changed:
             self._wg.check_local_routes(settings["advertised_routes"])
-            self._wg.replace_routes(clients, updated)
-        try:
-            self._storage.save_json(str(self._config.clients_file), updated)
-            self._write_profiles(updated)
-            if routes_changed:
-                self._fwd.apply_all()
-        except Exception:
-            if routes_changed:
-                self._wg.replace_routes(updated, clients)
-            self._storage.save_json(str(self._config.clients_file), clients)
-            self._write_profiles(clients)
-            if routes_changed:
-                self._fwd.apply_all()
-            raise
+        self._apply_peer_changes(clients, updated, routes_changed)
         return {"name": name, "options": settings}
 
     def _write_profiles(self, clients):
         server_public = self._wg.ensure_server_keys()[1]
         for client in clients:
             self._wg.write_client_config(client, server_public, clients)
+
+    def _apply_peer_changes(self, previous, updated, routes_changed, refresh=False):
+        if routes_changed:
+            self._wg.replace_routes(previous, updated)
+        try:
+            self._storage.save_json(str(self._config.clients_file), updated)
+            self._write_profiles(updated)
+            if refresh and not routes_changed:
+                self._wg.refresh_wireguard(updated)
+            if routes_changed or refresh:
+                self._fwd.apply_all()
+        except Exception:
+            restore = [
+                lambda: self._storage.save_json(str(self._config.clients_file), previous),
+                lambda: self._write_profiles(previous),
+            ]
+            if routes_changed:
+                restore.append(lambda: self._wg.replace_routes(updated, previous))
+            elif refresh:
+                restore.append(lambda: self._wg.refresh_wireguard(previous))
+            if refresh or routes_changed:
+                restore.append(self._fwd.apply_all)
+            for operation in restore:
+                try:
+                    operation()
+                except Exception:
+                    logging.exception("Could not fully restore the previous peer state")
+            raise
 
     @serialized
     def delete_client(self, name: str) -> dict:
@@ -162,23 +177,16 @@ class ClientManager:
             raise LookupError("Client not found.")
         removed = next(client for client in clients if client["name"] == name)
         routed = bool(peer_options(removed)["advertised_routes"])
-        if routed:
-            self._wg.replace_routes(clients, updated)
-        self._storage.save_json(str(self._config.clients_file), updated)
-
+        self._apply_peer_changes(clients, updated, routed, refresh=True)
         cfg = self._config.clients_dir / f"{name}.conf"
-        if cfg.exists():
-            cfg.unlink()
-
-        if routed:
-            self._write_profiles(updated)
-        else:
-            self._wg.refresh_wireguard(updated)
-        self._fwd.apply_all()
+        cfg.unlink(missing_ok=True)
 
         return {"removed": name}
 
+    @serialized
     def download_config_path(self, name: str):
+        if not any(client["name"] == name for client in self._wg.load_clients()):
+            raise LookupError("Config not found.")
         path = self._config.clients_dir / f"{name}.conf"
         if not path.exists():
             raise LookupError("Config not found.")
@@ -212,10 +220,14 @@ class ClientManager:
         for client in clients:
             self._wg.write_client_config(client, server_public, clients)
 
+        for client in clients:
+            settings = validate_options({}, client, clients, self._config.wg_network)
+            self._wg.check_local_routes(settings["advertised_routes"])
         self._wg.render_wireguard_config(clients, server_private)
-        self._wg.bounce_interface()
 
         default_client_ip = clients[0]["address"] if clients else None
         if default_client_ip and os.environ.get("SEED_FORWARDING", "1") == "1":
             self._fwd.seed_if_empty(default_client_ip)
+        self._fwd.apply_all()
+        self._wg.bounce_interface()
         logging.info("Bootstrap: %s clients loaded", len(clients))

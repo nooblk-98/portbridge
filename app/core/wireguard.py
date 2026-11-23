@@ -131,6 +131,8 @@ class WireGuardService:
     def bounce_interface(self):
         self._runner.run(["wg-quick", "down", str(self._config.wg_config_path)], check=False)
         self._runner.run(["wg-quick", "up", str(self._config.wg_config_path)])
+        if os.environ.get("ENABLE_IPV4_FORWARDING") == "1":
+            self._runner.run(["sysctl", "-w", "net.ipv4.ip_forward=1"])
         self.log_wireguard_status()
 
     def seamless_reload(self):
@@ -152,9 +154,13 @@ class WireGuardService:
         if not routes:
             return
         output = self._runner.run(["ip", "-j", "-4", "route", "show", "table", "all"]).stdout
+        try:
+            entries = json.loads(output)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("Unable to read server IPv4 routes.") from exc
         local = [
             ipaddress.IPv4Network(entry["dst"])
-            for entry in json.loads(output)
+            for entry in entries
             if entry.get("dst") not in (None, "default")
             and entry.get("dev") != self._config.wg_interface
         ]
@@ -170,8 +176,11 @@ class WireGuardService:
             self.render_wireguard_config(clients, server_private)
             self._runner.run(["wg-quick", "up", path])
         except Exception:
-            self.render_wireguard_config(previous, server_private)
-            self._runner.run(["wg-quick", "up", path])
+            try:
+                self.render_wireguard_config(previous, server_private)
+                self._runner.run(["wg-quick", "up", path])
+            except Exception:
+                logging.exception("Could not restore the previous WireGuard configuration")
             raise
 
     def peer_status_map(self) -> dict:

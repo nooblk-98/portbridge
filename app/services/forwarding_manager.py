@@ -48,12 +48,9 @@ class ForwardingManager:
         source_ip = data.get("source_ip")
         if source_ip:
             try:
-                ipaddress.ip_address(source_ip)
+                source_ip = str(ipaddress.IPv4Network(source_ip, strict=False))
             except ValueError:
-                try:
-                    ipaddress.ip_network(source_ip)
-                except ValueError:
-                    raise ValueError("Invalid source IP/CIDR.") from None
+                raise ValueError("Invalid IPv4 source IP/CIDR.") from None
 
         target_port_raw = data.get("target_port") or port
         try:

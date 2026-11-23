@@ -1,12 +1,14 @@
 import ipaddress
 import json
 import unittest
+from unittest.mock import MagicMock, patch
 
 from app.core.config import EnvConfigProvider
 from app.core.iptables import IPTablesService
 from app.core.peer_options import validate_options
 from app.core.providers import CommandResult, FakeRunner, InMemoryStorage
 from app.core.wireguard import WireGuardService
+from app.services.client_manager import ClientManager
 
 OWNER = {"name": "owner", "address": "10.8.0.2", "private_key": "owner-private", "public_key": "owner-public"}
 READER = {"name": "reader", "address": "10.8.0.3", "private_key": "reader-private", "public_key": "reader-public"}
@@ -62,25 +64,68 @@ class PeerRoutingTests(unittest.TestCase):
             self.wg.check_local_routes([ROUTE])
         self.wg.check_local_routes(["192.168.60.10/32"])
 
-    def test_firewall_advertisements_are_scoped_to_the_tunnel(self):
+    def test_firewall_advertisements_and_peer_replies_stay_in_tunnel(self):
         self.storage.save_json(str(self.config.clients_file), [OWNER | {"advertised_routes": [ROUTE]}])
         firewall = IPTablesService(self.config, self.storage, self.runner)
-        firewall._build_rules_into_tmp([], "eth0")
-        route_rules = [command for command in self.runner.commands if ROUTE in command]
-        self.assertEqual(len(route_rules), 2)
-        for command in route_rules:
-            self.assertEqual(command[command.index("-i") + 1], self.config.wg_interface)
-            self.assertEqual(command[command.index("-o") + 1], self.config.wg_interface)
-
-    def test_firewall_swap_copies_append_action(self):
-        firewall = IPTablesService(self.config, self.storage, self.runner)
-        chain = self.config.filter_chain
-        temporary = chain + "_TMP"
-        self.runner.responses[f"iptables -t filter -S {temporary}"] = CommandResult(
-            0, f"-A {temporary} -d {ROUTE} -j ACCEPT\n", ""
+        routes = firewall._routing_rules("eth0")
+        interface = self.config.wg_interface
+        self.assertEqual(len(routes), 3)
+        for rule in routes:
+            self.assertEqual(rule[:4], ["-i", interface, "-o", interface])
+        self.assertIn(
+            ["-i", interface, "-o", interface, "-s", "10.8.0.0/24", "-d", "10.8.0.0/24", "-j", "ACCEPT"], routes
         )
-        firewall._swap_chain("filter", chain, temporary, "FORWARD")
-        self.assertIn(["iptables", "-t", "filter", "-A", chain, "-d", ROUTE, "-j", "ACCEPT"], self.runner.commands)
+        self.assertEqual(sum(ROUTE in rule for rule in routes), 2)
+
+    def test_firewall_replaces_rules_and_installs_final_drops_atomically(self):
+        class RecordingRunner(FakeRunner):
+            def __init__(self):
+                super().__init__()
+                self.transactions = []
+
+            def run(self, cmd, *, check=True, input_data=None):
+                if input_data:
+                    self.transactions.append(input_data)
+                return super().run(cmd, check=check, input_data=input_data)
+
+        runner = RecordingRunner()
+        firewall = IPTablesService(self.config, self.storage, runner)
+        firewall.apply_forwardings([])
+        policy = runner.transactions[0]
+        chain = self.config.filter_chain
+        interface = self.config.wg_interface
+        self.assertIn(f"-F {chain}\n", policy)
+        self.assertIn(f"-I FORWARD 1 -j {chain}\n", policy)
+        self.assertIn(f"-A {chain} -i {interface} -j DROP\n", policy)
+        self.assertIn(f"-A {chain} -o {interface} -j DROP\n", policy)
+        self.assertTrue(policy.endswith("COMMIT\n"))
+
+    def test_options_rollback_restores_profiles_and_preserves_original_error(self):
+        previous = [OWNER, READER]
+        self.storage.save_json(str(self.config.clients_file), previous)
+        wg = MagicMock()
+        wg.load_clients.return_value = previous
+        wg.ensure_server_keys.return_value = ("private", "public")
+        forwarding = MagicMock()
+        forwarding.apply_all.side_effect = [RuntimeError("firewall failure"), None]
+        manager = ClientManager(wg, self.storage, self.config, forwarding)
+        with self.assertRaisesRegex(RuntimeError, "firewall failure"):
+            manager.update_options("owner", {"advertised_routes": [ROUTE]})
+        self.assertEqual(self.storage.load_json(str(self.config.clients_file)), previous)
+        updated = wg.replace_routes.call_args_list[0].args[1]
+        self.assertEqual(wg.replace_routes.call_args_list[1].args, (updated, previous))
+        self.assertEqual(wg.write_client_config.call_args.args, (READER, "public", previous))
+
+    def test_deleted_advertiser_withdraws_route_and_updates_other_profiles(self):
+        owner = OWNER | {"advertised_routes": [ROUTE]}
+        wg = MagicMock()
+        wg.load_clients.return_value = [owner, READER]
+        wg.ensure_server_keys.return_value = ("private", "public")
+        manager = ClientManager(wg, self.storage, self.config, MagicMock())
+        with patch("pathlib.Path.unlink"):
+            self.assertEqual(manager.delete_client("owner"), {"removed": "owner"})
+        wg.replace_routes.assert_called_once_with([owner, READER], [READER])
+        wg.write_client_config.assert_called_once_with(READER, "public", [READER])
 
     def test_failed_route_install_restores_prior_wireguard_config(self):
         class FailingRunner(FakeRunner):
