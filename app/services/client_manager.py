@@ -1,19 +1,40 @@
 import ipaddress
 import logging
+import os
+import re
 import time
+from functools import wraps
+from threading import RLock
 
+from app.core.peer_options import peer_options, validate_options
 from app.core.providers import ConfigProvider, StorageBackend
 from app.core.wireguard import WireGuardService
 from app.services.forwarding_manager import ForwardingManager
 
 
+def serialized(method):
+    @wraps(method)
+    def call(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return call
+
+
+def validate_name(name):
+    if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", name):
+        raise ValueError("Use 1–64 letters, numbers, dots, underscores or hyphens, starting with a letter or number.")
+
+
 class ClientManager:
     def __init__(self, wg: WireGuardService, storage: StorageBackend, config: ConfigProvider, fwd: ForwardingManager):
+        self._lock = RLock()
         self._wg = wg
         self._storage = storage
         self._config = config
         self._fwd = fwd
 
+    @serialized
     def list_clients(self) -> dict:
         server_public = self._wg.ensure_server_keys()[1]
         clients = self._wg.load_clients()
@@ -34,11 +55,14 @@ class ClientManager:
                     "rx_bytes": peer_state.get("rx_bytes", 0),
                     "tx_bytes": peer_state.get("tx_bytes", 0),
                     "forwardings": forwards,
+                    "options": peer_options(client),
                 }
             )
         return {"server_public_key": server_public, "items": payload}
 
+    @serialized
     def create_client(self, name: str, address: str | None = None) -> dict:
+        validate_name(name)
         clients = self._wg.load_clients()
         if any(c["name"] == name for c in clients):
             raise ValueError("Client name already exists.")
@@ -69,13 +93,15 @@ class ClientManager:
         self._storage.save_json(str(self._config.clients_file), clients)
 
         server_public = self._wg.ensure_server_keys()[1]
-        self._wg.write_client_config(client, server_public)
+        self._wg.write_client_config(client, server_public, clients)
         self._wg.refresh_wireguard(clients)
         self._fwd.apply_all()
 
         return {"name": name, "config": f"/clients/{name}.conf"}
 
+    @serialized
     def rename_client(self, old_name: str, new_name: str) -> dict:
+        validate_name(new_name)
         clients = self._wg.load_clients()
         target = next((c for c in clients if c["name"] == old_name), None)
         if not target:
@@ -91,23 +117,63 @@ class ClientManager:
         target["name"] = new_name
         self._storage.save_json(str(self._config.clients_file), clients)
         server_public = self._wg.ensure_server_keys()[1]
-        self._wg.write_client_config(target, server_public)
+        self._wg.write_client_config(target, server_public, clients)
         self._wg.refresh_wireguard(clients)
 
         return {"name": new_name}
 
+    @serialized
+    def update_options(self, name: str, options: dict) -> dict:
+        clients = self._wg.load_clients()
+        target = next((client for client in clients if client["name"] == name), None)
+        if target is None:
+            raise LookupError("Client not found.")
+        settings = validate_options(options, target, clients, self._config.wg_network)
+        updated = [client | settings if client is target else client for client in clients]
+        routes_changed = settings["advertised_routes"] != peer_options(target)["advertised_routes"]
+        if routes_changed:
+            self._wg.check_local_routes(settings["advertised_routes"])
+            self._wg.replace_routes(clients, updated)
+        try:
+            self._storage.save_json(str(self._config.clients_file), updated)
+            self._write_profiles(updated)
+            if routes_changed:
+                self._fwd.apply_all()
+        except Exception:
+            if routes_changed:
+                self._wg.replace_routes(updated, clients)
+            self._storage.save_json(str(self._config.clients_file), clients)
+            self._write_profiles(clients)
+            if routes_changed:
+                self._fwd.apply_all()
+            raise
+        return {"name": name, "options": settings}
+
+    def _write_profiles(self, clients):
+        server_public = self._wg.ensure_server_keys()[1]
+        for client in clients:
+            self._wg.write_client_config(client, server_public, clients)
+
+    @serialized
     def delete_client(self, name: str) -> dict:
         clients = self._wg.load_clients()
         updated = [c for c in clients if c["name"] != name]
         if len(updated) == len(clients):
             raise LookupError("Client not found.")
+        removed = next(client for client in clients if client["name"] == name)
+        routed = bool(peer_options(removed)["advertised_routes"])
+        if routed:
+            self._wg.replace_routes(clients, updated)
         self._storage.save_json(str(self._config.clients_file), updated)
 
         cfg = self._config.clients_dir / f"{name}.conf"
         if cfg.exists():
             cfg.unlink()
 
-        self._wg.refresh_wireguard(updated)
+        if routed:
+            self._write_profiles(updated)
+        else:
+            self._wg.refresh_wireguard(updated)
         self._fwd.apply_all()
 
         return {"removed": name}
@@ -144,12 +210,12 @@ class ClientManager:
             self._wg.write_client_config(default_client, server_public)
 
         for client in clients:
-            self._wg.write_client_config(client, server_public)
+            self._wg.write_client_config(client, server_public, clients)
 
         self._wg.render_wireguard_config(clients, server_private)
         self._wg.bounce_interface()
 
         default_client_ip = clients[0]["address"] if clients else None
-        if default_client_ip:
+        if default_client_ip and os.environ.get("SEED_FORWARDING", "1") == "1":
             self._fwd.seed_if_empty(default_client_ip)
         logging.info("Bootstrap: %s clients loaded", len(clients))

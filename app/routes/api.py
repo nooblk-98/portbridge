@@ -72,6 +72,17 @@ def api_rename_client(name):
         abort(404)
 
 
+@bp.patch("/api/clients/<name>/options")
+@login_required
+def api_peer_options(name):
+    try:
+        return jsonify(_cm().update_options(name, request.get_json(silent=True)))
+    except ValueError as exc:
+        return jsonify(description=str(exc)), 400
+    except LookupError:
+        abort(404)
+
+
 @bp.delete("/api/clients/<name>")
 @login_required
 def api_delete_client(name):

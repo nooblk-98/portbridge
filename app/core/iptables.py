@@ -1,5 +1,7 @@
 import logging
+from threading import RLock
 
+from app.core.peer_options import peer_options
 from app.core.providers import CommandRunner, ConfigProvider, StorageBackend
 from app.core.rule_renderer import protocols_overlap, render_rule
 
@@ -9,6 +11,7 @@ class IPTablesService:
         self._config = config
         self._storage = storage
         self._runner = runner
+        self._lock = RLock()
         self._nat_tmp = config.nat_chain + "_TMP"
         self._filter_tmp = config.filter_chain + "_TMP"
 
@@ -24,11 +27,11 @@ class IPTablesService:
 
     def _ensure_masquerade(self, ext_iface: str):
         check = self._runner.run(
-            ["iptables", "-t", "nat", "-C", "POSTROUTING", "-o", ext_iface, "-j", "MASQUERADE"],
+            ["iptables", "-t", "nat", "-C", "POSTROUTING", "-s", str(self._config.wg_network), "-o", ext_iface, "-j", "MASQUERADE"],
             check=False,
         )
         if check.returncode != 0:
-            self._runner.run(["iptables", "-t", "nat", "-A", "POSTROUTING", "-o", ext_iface, "-j", "MASQUERADE"])
+            self._runner.run(["iptables", "-t", "nat", "-A", "POSTROUTING", "-s", str(self._config.wg_network), "-o", ext_iface, "-j", "MASQUERADE"])
 
     def _ensure_chain(self, table: str, chain: str):
         self._runner.run(["iptables", "-t", table, "-N", chain], check=False)
@@ -49,6 +52,17 @@ class IPTablesService:
                 chain = self._nat_tmp if cmd.table == "nat" else self._filter_tmp
                 self._runner.run(["iptables", "-t", cmd.table, "-A", chain] + cmd.args)
 
+        interface = self._config.wg_interface
+        clients = self._storage.load_json(str(self._config.clients_file), [])
+        for peer in clients:
+            for route in peer_options(peer)["advertised_routes"]:
+                base = ["iptables", "-t", "filter", "-A", self._filter_tmp,
+                        "-i", interface, "-o", interface]
+                network = str(self._config.wg_network)
+                self._runner.run(base + ["-s", network, "-d", route, "-j", "ACCEPT"])
+                self._runner.run(base + ["-s", route, "-d", network, "-m", "conntrack",
+                                         "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"])
+
     def _swap_chain(self, table: str, live_chain: str, tmp_chain: str, parent_chain: str):
         self._ensure_chain(table, live_chain)
         present = self._runner.run(["iptables", "-t", table, "-C", parent_chain, "-j", live_chain], check=False)
@@ -61,18 +75,19 @@ class IPTablesService:
         for line in (res.stdout or "").splitlines():
             if line.startswith(f"-A {tmp_chain}"):
                 new_rule = line.replace(f"-A {tmp_chain}", f"-A {live_chain}", 1)
-                self._runner.run(["iptables", "-t", table] + new_rule.split()[1:])
+                self._runner.run(["iptables", "-t", table] + new_rule.split())
 
         self._runner.run(["iptables", "-t", table, "-F", tmp_chain], check=False)
         self._runner.run(["iptables", "-t", table, "-X", tmp_chain], check=False)
 
     def apply_forwardings(self, rules: list[dict]):
-        ext_iface = self.detect_primary_interface()
-        self._build_rules_into_tmp(rules, ext_iface)
-        self._swap_chain("nat", self._config.nat_chain, self._nat_tmp, "PREROUTING")
-        self._swap_chain("filter", self._config.filter_chain, self._filter_tmp, "FORWARD")
-        self._ensure_masquerade(ext_iface)
-        logging.info("Applied %s forwarding rules", len(rules))
+        with self._lock:
+            ext_iface = self.detect_primary_interface()
+            self._build_rules_into_tmp(rules, ext_iface)
+            self._swap_chain("nat", self._config.nat_chain, self._nat_tmp, "PREROUTING")
+            self._swap_chain("filter", self._config.filter_chain, self._filter_tmp, "FORWARD")
+            self._ensure_masquerade(ext_iface)
+            logging.info("Applied %s forwarding rules", len(rules))
 
     def load_forwardings(self, default_client_ip: str | None = None) -> list[dict]:
         payload = self._storage.load_json(str(self._config.forward_file), None)
