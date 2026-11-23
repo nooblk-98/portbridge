@@ -106,11 +106,13 @@ After=network-online.target
 [Service]
 WorkingDirectory=/opt/portbridge
 EnvironmentFile=/etc/portbridge/portbridge.env
+# Keep the shared iptables lock usable inside the read-only mount namespace.
+ExecStartPre=+/usr/bin/touch /run/xtables.lock
 ExecStart=/opt/portbridge/portbridge
 NoNewPrivileges=true
 ProtectHome=true
 ProtectSystem=strict
-ReadWritePaths=/etc/portbridge /var/lib/portbridge
+ReadWritePaths=/etc/portbridge /var/lib/portbridge -/run/xtables.lock
 ExecStopPost=-/usr/bin/wg-quick down /etc/portbridge/pb0.conf
 UMask=0077
 Restart=on-failure
