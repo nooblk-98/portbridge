@@ -5,7 +5,7 @@ import os
 import re
 from threading import RLock
 
-from app.core.peer_options import PRIVATE_ROUTES, peer_options
+from app.core.peer_options import PRIVATE_ROUTES, allowed_recipient_addresses, peer_options, validated_peers
 from app.core.providers import CommandRunner, ConfigProvider, StorageBackend
 from app.core.rule_renderer import protocols_overlap, render_rule
 
@@ -58,11 +58,14 @@ class IPTablesService:
         same_tunnel = ["-i", interface, "-o", interface]
         established = ["-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED"]
         rules = [same_tunnel + ["-s", network, "-d", network, "-j", "ACCEPT"]]
-        clients = self._storage.load_json(str(self._config.clients_file), [])
+        clients = validated_peers(self._storage.load_json(str(self._config.clients_file), []))
         for peer in clients:
             for route in peer_options(peer)["advertised_routes"]:
-                rules.append(same_tunnel + ["-s", network, "-d", route, "-j", "ACCEPT"])
-                rules.append(same_tunnel + ["-s", route, "-d", network, *established, "-j", "ACCEPT"])
+                if not isinstance(route, str):
+                    continue
+                for address in allowed_recipient_addresses(peer, route, clients):
+                    rules.append(same_tunnel + ["-s", f"{address}/32", "-d", route, "-j", "ACCEPT"])
+                    rules.append(same_tunnel + ["-s", route, "-d", f"{address}/32", *established, "-j", "ACCEPT"])
         if os.environ.get("ALLOW_INTERNET_EGRESS") == "1":
             for destination in (*EGRESS_BLOCKS, *self._external_connected_routes(ext_iface)):
                 rules.append(["-i", interface, "-o", ext_iface, "-d", str(destination), "-j", "DROP"])

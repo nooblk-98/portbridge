@@ -1,3 +1,4 @@
+import hashlib
 import ipaddress
 import logging
 import os
@@ -6,7 +7,7 @@ import time
 from functools import wraps
 from threading import RLock
 
-from app.core.peer_options import peer_options, validate_options
+from app.core.peer_options import allowed_recipient_keys, peer_options, validate_options
 from app.core.providers import ConfigProvider, StorageBackend
 from app.core.wireguard import WireGuardService
 from app.services.forwarding_manager import ForwardingManager
@@ -40,10 +41,14 @@ class ClientManager:
         clients = self._wg.load_clients()
         fwd = self._fwd.list_rules()
         status = self._wg.peer_status_map()
+        exports = self._load_profile_exports()
         payload = []
+        routes = []
+        profiles = []
         for client in clients:
             forwards = [r for r in fwd if str(r.get("client_ip")) == client["address"]]
             peer_state = status.get(client["public_key"], {})
+            options = peer_options(client)
             payload.append(
                 {
                     "name": client["name"],
@@ -55,10 +60,66 @@ class ClientManager:
                     "rx_bytes": peer_state.get("rx_bytes", 0),
                     "tx_bytes": peer_state.get("tx_bytes", 0),
                     "forwardings": forwards,
-                    "options": peer_options(client),
+                    "options": options,
                 }
             )
-        return {"server_public_key": server_public, "items": payload}
+            for route in options["advertised_routes"]:
+                allowed = allowed_recipient_keys(client, route, clients)
+                routes.append(
+                    {
+                        "cidr": route,
+                        "owner_name": client["name"],
+                        "owner_public_key": client["public_key"],
+                        "owner_online": bool(peer_state.get("online")),
+                        "owner_last_handshake": peer_state.get("handshake"),
+                        "allowed_peer_public_keys": None if allowed is None else sorted(allowed),
+                    }
+                )
+            if options["split_tunnel"]:
+                exported = exports.get(client["name"])
+                profiles.append(
+                    {
+                        "name": client["name"],
+                        "profile_refresh_required": (
+                            None
+                            if exported is None
+                            else exported != self._profile_revision(client, clients, server_public)
+                        ),
+                    }
+                )
+        return {
+            "server_public_key": server_public,
+            "items": payload,
+            "routes": routes,
+            "split_tunnel_profiles": profiles,
+        }
+
+    def _profile_exports_path(self) -> str:
+        return str(self._config.data_dir / "profile_exports.json")
+
+    def _load_profile_exports(self) -> dict:
+        payload = self._storage.load_json(self._profile_exports_path(), {})
+        return payload if isinstance(payload, dict) else {}
+
+    def _profile_revision(self, client: dict, clients: list[dict], server_public: str | None = None) -> str:
+        if server_public is None:
+            server_public = self._wg.ensure_server_keys()[1]
+        content = self._wg.render_client_config(client, server_public, clients)
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    @serialized
+    def record_profile_export(self, name: str, content: str | None = None) -> None:
+        clients = self._wg.load_clients()
+        client = next((entry for entry in clients if entry["name"] == name), None)
+        if client is None:
+            raise LookupError("Client not found.")
+        if content is None:
+            content = self._storage.read_text(str(self._config.clients_dir / f"{name}.conf"))
+        if content is None:
+            content = self._wg.render_client_config(client, self._wg.ensure_server_keys()[1], clients)
+        exports = self._load_profile_exports()
+        exports[name] = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        self._storage.save_json(self._profile_exports_path(), exports)
 
     @serialized
     def create_client(self, name: str, address: str | None = None) -> dict:
@@ -116,6 +177,10 @@ class ClientManager:
 
         target["name"] = new_name
         self._storage.save_json(str(self._config.clients_file), clients)
+        exports = self._load_profile_exports()
+        if old_name in exports:
+            exports[new_name] = exports.pop(old_name)
+            self._storage.save_json(self._profile_exports_path(), exports)
         server_public = self._wg.ensure_server_keys()[1]
         self._wg.write_client_config(target, server_public, clients)
         self._wg.refresh_wireguard(clients)
@@ -128,12 +193,14 @@ class ClientManager:
         target = next((client for client in clients if client["name"] == name), None)
         if target is None:
             raise LookupError("Client not found.")
+        previous_settings = peer_options(target)
         settings = validate_options(options, target, clients, self._config.wg_network)
         updated = [client | settings if client is target else client for client in clients]
-        routes_changed = settings["advertised_routes"] != peer_options(target)["advertised_routes"]
+        routes_changed = settings["advertised_routes"] != previous_settings["advertised_routes"]
+        access_changed = settings["route_access"] != previous_settings["route_access"]
         if routes_changed:
             self._wg.check_local_routes(settings["advertised_routes"])
-        self._apply_peer_changes(clients, updated, routes_changed)
+        self._apply_peer_changes(clients, updated, routes_changed, policy_changed=access_changed)
         return {"name": name, "options": settings}
 
     def _write_profiles(self, clients):
@@ -141,7 +208,7 @@ class ClientManager:
         for client in clients:
             self._wg.write_client_config(client, server_public, clients)
 
-    def _apply_peer_changes(self, previous, updated, routes_changed, refresh=False):
+    def _apply_peer_changes(self, previous, updated, routes_changed, refresh=False, policy_changed=False):
         if routes_changed:
             self._wg.replace_routes(previous, updated)
         try:
@@ -149,7 +216,7 @@ class ClientManager:
             self._write_profiles(updated)
             if refresh and not routes_changed:
                 self._wg.refresh_wireguard(updated)
-            if routes_changed or refresh:
+            if routes_changed or refresh or policy_changed:
                 self._fwd.apply_all()
         except Exception:
             restore = [
@@ -160,7 +227,7 @@ class ClientManager:
                 restore.append(lambda: self._wg.replace_routes(updated, previous))
             elif refresh:
                 restore.append(lambda: self._wg.refresh_wireguard(previous))
-            if refresh or routes_changed:
+            if refresh or routes_changed or policy_changed:
                 restore.append(self._fwd.apply_all)
             for operation in restore:
                 try:
@@ -180,6 +247,10 @@ class ClientManager:
         self._apply_peer_changes(clients, updated, routed, refresh=True)
         cfg = self._config.clients_dir / f"{name}.conf"
         cfg.unlink(missing_ok=True)
+        exports = self._load_profile_exports()
+        if name in exports:
+            exports.pop(name)
+            self._storage.save_json(self._profile_exports_path(), exports)
 
         return {"removed": name}
 

@@ -98,7 +98,9 @@ def api_delete_client(name):
 def api_download_client(name):
     try:
         path = _cm().download_config_path(name)
-        return send_file(str(path), mimetype="text/plain", download_name=f"{name}.conf", as_attachment=True)
+        response = send_file(str(path), mimetype="text/plain", download_name=f"{name}.conf", as_attachment=True)
+        _cm().record_profile_export(name)
+        return response
     except LookupError:
         abort(404)
 
@@ -114,6 +116,10 @@ def api_qr_client(name):
     buffer = io.BytesIO()
     qr.save(buffer, kind="png", scale=5, dark="black", light=None)
     buffer.seek(0)
+    try:
+        _cm().record_profile_export(name, content)
+    except LookupError:
+        abort(404)
     return send_file(buffer, mimetype="image/png", download_name=f"{name}.png")
 
 

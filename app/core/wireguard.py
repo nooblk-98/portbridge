@@ -4,7 +4,7 @@ import logging
 import os
 import time
 
-from app.core.peer_options import peer_options
+from app.core.peer_options import may_receive_route, peer_options
 from app.core.providers import CommandRunner, ConfigProvider, StorageBackend
 
 
@@ -52,14 +52,17 @@ class WireGuardService:
                 continue
         return clients
 
-    def write_client_config(self, client: dict, server_public: str, clients=()):
+    def render_client_config(self, client: dict, server_public: str, clients=()) -> str:
         options = peer_options(client)
         routes = ["0.0.0.0/0"]
         if options["split_tunnel"]:
             routes = [str(self._config.wg_network)]
             for peer in clients:
-                if peer["name"] != client["name"]:
-                    routes.extend(peer_options(peer)["advertised_routes"])
+                if peer["name"] == client["name"]:
+                    continue
+                for route in peer_options(peer)["advertised_routes"]:
+                    if may_receive_route(client, peer, route, clients) and route not in routes:
+                        routes.append(route)
         interface = [
             "[Interface]",
             f"PrivateKey = {client['private_key']}",
@@ -84,6 +87,10 @@ class WireGuardService:
                 "",
             ]
         )
+        return cfg
+
+    def write_client_config(self, client: dict, server_public: str, clients=()):
+        cfg = self.render_client_config(client, server_public, clients)
         path = str(self._config.clients_dir / f"{client['name']}.conf")
         self._storage.write_text(path, cfg)
         try:
