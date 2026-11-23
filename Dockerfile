@@ -15,7 +15,6 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages -r /tmp/requir
 
 WORKDIR /app
 COPY app /app/app
-COPY config /app/config
 COPY run.py /app/run.py
 
 ENV PYTHONUNBUFFERED=1
