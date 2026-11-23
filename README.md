@@ -4,7 +4,7 @@ PortBridge connects devices behind NAT or CGNAT to a WireGuard server you contro
 
 ## Install on Debian or Ubuntu without Docker
 
-Use a dedicated server with systemd, sudo access, and a public IP address or DNS name. For a source install, first install Rust 1.85 or newer and Cargo as your regular user. A trusted prebuilt binary for your architecture can be used in place of the build step. Allow inbound UDP 51820 in your server and provider firewalls.
+Use a dedicated server with systemd, sudo access, and a public IP address or DNS name. For a source install, install `build-essential` with apt, then install Rust 1.85 or newer and Cargo through rustup as your regular user. A trusted prebuilt binary for your architecture can be used in place of the build step. Allow inbound UDP 51820 in your server and provider firewalls.
 
 ```sh
 git clone https://github.com/nooblk-98/portbridge.git
