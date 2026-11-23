@@ -29,6 +29,9 @@ env/
 ENV/
 .env
 
+# Rust
+/target/
+
 # IDE
 .idea/
 .vscode/

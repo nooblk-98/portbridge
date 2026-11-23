@@ -3,24 +3,69 @@ name: Verify
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, development]
 
 permissions:
   contents: read
 
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  rust:
+    name: Rust checks
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
-      - name: Install dependencies
-        run: |
-          python3 -m venv .venv
-          .venv/bin/python -m pip install -r requirements.txt
+        with:
+          persist-credentials: false
+      - name: Install Rust components
+        run: rustup component add rustfmt clippy
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Lint
+        run: cargo clippy --all-targets --locked -- -D warnings
       - name: Run tests
-        run: .venv/bin/python -m unittest discover -s tests -v
-      - name: Check installer and dashboard syntax
+        run: cargo test --locked
+      - name: Build release binary
+        run: cargo build --release --locked --bin portbridge
+
+  container:
+    name: Container build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Build image
+        run: docker build --pull --tag portbridge:verify .
+      - name: Check runtime image contents
         run: |
-          bash -n install.sh
+          docker run --rm --network none --entrypoint sh portbridge:verify -ec '
+            test -x /usr/local/bin/portbridge
+            test -f /app/app/templates/login.html
+            test -f /app/app/static/js/app.js
+            ! command -v python3
+            ! command -v pip3
+          '
+
+  installer:
+    name: Installer and dashboard scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Check shell syntax
+        run: bash -n install.sh
+      - name: ShellCheck
+        run: shellcheck --severity=warning install.sh
+      - name: Check dashboard scripts
+        run: |
           node --check app/static/js/app.js
           node --check app/static/js/login.js
+          node --check app/static/js/route-access.js

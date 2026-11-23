@@ -4,7 +4,7 @@ PortBridge connects devices behind NAT or CGNAT to a WireGuard server you contro
 
 ## Install on Debian or Ubuntu without Docker
 
-Use a dedicated server with systemd, sudo access, and a public IP address or DNS name. Allow inbound UDP 51820 in your server and provider firewalls.
+Use a dedicated server with systemd, sudo access, and a public IP address or DNS name. The installer builds PortBridge with Rust and Cargo. You can supply an existing build with `sudo PORTBRIDGE_BINARY=/path/to/portbridge bash install.sh vpn.example.com`. The running service does not require a language runtime. Allow inbound UDP 51820 in your server and provider firewalls.
 
 ```sh
 git clone https://github.com/nooblk-98/portbridge.git
