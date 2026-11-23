@@ -201,8 +201,6 @@ class ClientManager:
         server_private, server_public = self._wg.ensure_server_keys()
         clients = self._wg.load_clients()
 
-        self._fwd.bind_legacy_rules()
-
         if not clients:
             import time as _time
 

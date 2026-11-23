@@ -24,17 +24,6 @@ class ForwardingManager:
         clients = self._storage.load_json(str(self._config.clients_file), [])
         return {client["address"]: client["public_key"] for client in clients}
 
-    def bind_legacy_rules(self):
-        owners = self._owners()
-        rules = self._ipt.load_forwardings()
-        bound = []
-        for rule in rules:
-            owner = owners.get(str(rule.get("client_ip")))
-            if owner and rule.get("peer_public_key", owner) == owner:
-                bound.append(rule | {"peer_public_key": owner})
-        if bound != rules:
-            self._storage.save_json(str(self._config.forward_file), bound)
-
     def add_rule(self, data: dict) -> dict:
         try:
             port_raw = data.get("port")
@@ -100,14 +89,14 @@ class ForwardingManager:
         if conflict:
             raise ValueError(f"Cannot forward reserved system ports ({', '.join(map(str, reserved_ports))}).")
 
-        rules = self.list_rules()
-        for rule in rules:
+        for rule in self.list_rules():
             existing_proto = rule.get("protocol", "both")
             existing_port = str(rule.get("port", -1))
             if existing_port == str(port) and protocols_overlap(existing_proto, proto):
                 if str(rule.get("client_ip")) != str(client_ip):
                     raise ValueError("Port is already in use by another client.")
 
+        rules = self._ipt.load_forwardings()
         rules = [r for r in rules if not (str(r.get("port", -1)) == str(port) and r.get("protocol", "both") == proto)]
         rules.append(
             {

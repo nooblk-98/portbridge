@@ -138,26 +138,23 @@ class PeerRoutingTests(unittest.TestCase):
             deny = ["-i", "wg0", "-o", "eth0", "-d", destination, "-j", "DROP"]
             self.assertLess(rules.index(deny), internet_allow)
 
-    def test_legacy_forward_binds_to_key_and_does_not_transfer_on_address_reuse(self):
+    def test_legacy_forward_stays_inactive_until_admin_confirms_current_peer(self):
         firewall = IPTablesService(self.config, self.storage, self.runner)
         manager = ForwardingManager(firewall, self.storage, self.config)
         client_file = str(self.config.clients_file)
-        self.storage.save_json(client_file, [OWNER])
-        self.storage.save_json(
-            str(self.config.forward_file),
-            [
-                {"port": 30001, "client_ip": OWNER["address"], "target_port": 80},
-                {"port": 30002, "client_ip": READER["address"], "target_port": 80},
-            ],
-        )
-        manager.bind_legacy_rules()
-        (active,) = manager.list_rules()
-        self.assertEqual(active["peer_public_key"], OWNER["public_key"])
-        self.assertEqual(len(firewall.load_forwardings()), 1)
-        self.storage.save_json(client_file, [OWNER | {"public_key": "replacement"}])
+        replacement = OWNER | {"public_key": "replacement"}
+        self.storage.save_json(client_file, [replacement])
+        legacy = {"port": 30001, "protocol": "tcp", "client_ip": OWNER["address"], "target_port": 80}
+        self.storage.save_json(str(self.config.forward_file), [legacy])
         self.assertEqual(manager.list_rules(), [])
-        manager.bind_legacy_rules()
-        self.assertEqual(firewall.load_forwardings(), [])
+        self.assertEqual(firewall.load_forwardings(), [legacy])
+
+        manager.add_rule(legacy)
+        (active,) = manager.list_rules()
+        self.assertEqual(active["peer_public_key"], replacement["public_key"])
+        self.assertEqual(len(firewall.load_forwardings()), 1)
+        self.storage.save_json(client_file, [OWNER])
+        self.assertEqual(manager.list_rules(), [])
 
     def test_failed_route_install_restores_prior_wireguard_config(self):
         class FailingRunner(FakeRunner):
