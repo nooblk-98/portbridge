@@ -39,11 +39,11 @@ You can advertise private IPv4 ranges and the shared address block `100.64.0.0/1
 
 ## Publish a specific service
 
-Open **Forwarding**, create a rule, and select a public port, protocol, target peer and service port. Set a source IP or CIDR to restrict access when needed. The service sees the VPN server’s address as the connection source. Allow the public port through the server and provider firewalls. For Docker, publish the same port and protocol in Compose.
+Open **Forwarding**, create a rule, and select a public port, protocol, target peer and service port. Set a source IP or CIDR to restrict access when needed. The service sees the original connection source. Its replies must return through WireGuard. When using a split-tunnel profile, configure a return route for the permitted public sources or use a full-tunnel profile. Allow the public port through the server and provider firewalls. For Docker, publish the same port and protocol in Compose.
 
 ## Existing Docker installations
 
-The [Compose example](docker-compose-live.yml) uses the published image. On upgrade, set `WG_HOST` and a strong `ADMIN_PASSWORD` in your Compose environment. Both Compose examples now bind the dashboard to localhost. Use the SSH tunnel above to reach a remote dashboard. Existing Docker volumes contain your peer keys and rules. Keep the volume when upgrading. Features documented here require an image built from a version that includes them.
+The [Compose example](docker-compose-live.yml) uses the published image. On upgrade, set `WG_HOST` and a strong `ADMIN_PASSWORD` in your Compose environment. Full-tunnel internet access now requires the explicit setting below. Both Compose examples now bind the dashboard to localhost. Use the SSH tunnel above to reach a remote dashboard. Existing Docker volumes contain your peer keys and rules. Keep the volume when upgrading. Features documented here require an image built from a version that includes them.
 
 ## Internet access through the VPN
 

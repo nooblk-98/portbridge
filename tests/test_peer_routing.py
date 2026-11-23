@@ -9,6 +9,7 @@ from app.core.peer_options import validate_options
 from app.core.providers import CommandResult, FakeRunner, InMemoryStorage
 from app.core.wireguard import WireGuardService
 from app.services.client_manager import ClientManager
+from app.services.forwarding_manager import ForwardingManager
 
 OWNER = {"name": "owner", "address": "10.8.0.2", "private_key": "owner-private", "public_key": "owner-public"}
 READER = {"name": "reader", "address": "10.8.0.3", "private_key": "reader-private", "public_key": "reader-public"}
@@ -126,6 +127,37 @@ class PeerRoutingTests(unittest.TestCase):
             self.assertEqual(manager.delete_client("owner"), {"removed": "owner"})
         wg.replace_routes.assert_called_once_with([owner, READER], [READER])
         wg.write_client_config.assert_called_once_with(READER, "public", [READER])
+
+    def test_egress_blocks_platform_routes_before_allowing_internet(self):
+        firewall = IPTablesService(self.config, self.storage, self.runner)
+        self.runner.responses["ip -j -4 route show dev eth0"] = CommandResult(0, "[]", "")
+        with patch.dict("os.environ", {"ALLOW_INTERNET_EGRESS": "1"}):
+            rules = firewall._routing_rules("eth0")
+        internet_allow = rules.index(["-i", "wg0", "-o", "eth0", "-s", "10.8.0.0/24", "-j", "ACCEPT"])
+        for destination in ("169.254.0.0/16", "168.63.129.16/32"):
+            deny = ["-i", "wg0", "-o", "eth0", "-d", destination, "-j", "DROP"]
+            self.assertLess(rules.index(deny), internet_allow)
+
+    def test_legacy_forward_binds_to_key_and_does_not_transfer_on_address_reuse(self):
+        firewall = IPTablesService(self.config, self.storage, self.runner)
+        manager = ForwardingManager(firewall, self.storage, self.config)
+        client_file = str(self.config.clients_file)
+        self.storage.save_json(client_file, [OWNER])
+        self.storage.save_json(
+            str(self.config.forward_file),
+            [
+                {"port": 30001, "client_ip": OWNER["address"], "target_port": 80},
+                {"port": 30002, "client_ip": READER["address"], "target_port": 80},
+            ],
+        )
+        manager.bind_legacy_rules()
+        (active,) = manager.list_rules()
+        self.assertEqual(active["peer_public_key"], OWNER["public_key"])
+        self.assertEqual(len(firewall.load_forwardings()), 1)
+        self.storage.save_json(client_file, [OWNER | {"public_key": "replacement"}])
+        self.assertEqual(manager.list_rules(), [])
+        manager.bind_legacy_rules()
+        self.assertEqual(firewall.load_forwardings(), [])
 
     def test_failed_route_install_restores_prior_wireguard_config(self):
         class FailingRunner(FakeRunner):

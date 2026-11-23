@@ -201,6 +201,8 @@ class ClientManager:
         server_private, server_public = self._wg.ensure_server_keys()
         clients = self._wg.load_clients()
 
+        self._fwd.bind_legacy_rules()
+
         if not clients:
             import time as _time
 
@@ -226,7 +228,7 @@ class ClientManager:
         self._wg.render_wireguard_config(clients, server_private)
 
         default_client_ip = clients[0]["address"] if clients else None
-        if default_client_ip and os.environ.get("SEED_FORWARDING", "1") == "1":
+        if default_client_ip and os.environ.get("SEED_FORWARDING") == "1":
             self._fwd.seed_if_empty(default_client_ip)
         self._fwd.apply_all()
         self._wg.bounce_interface()

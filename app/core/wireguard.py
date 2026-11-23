@@ -72,15 +72,18 @@ class WireGuardService:
         host = self._config.wg_host
         if ":" in host and not host.startswith("["):
             host = f"[{host}]"
-        cfg = "\n".join(interface + [
-            "",
-            "[Peer]",
-            f"PublicKey = {server_public}",
-            f"Endpoint = {host}:{self._config.wg_port}",
-            f"AllowedIPs = {', '.join(routes)}",
-            f"PersistentKeepalive = {options['keepalive']}",
-            "",
-        ])
+        cfg = "\n".join(
+            interface
+            + [
+                "",
+                "[Peer]",
+                f"PublicKey = {server_public}",
+                f"Endpoint = {host}:{self._config.wg_port}",
+                f"AllowedIPs = {', '.join(routes)}",
+                f"PersistentKeepalive = {options['keepalive']}",
+                "",
+            ]
+        )
         path = str(self._config.clients_dir / f"{client['name']}.conf")
         self._storage.write_text(path, cfg)
         try:
@@ -111,7 +114,8 @@ class WireGuardService:
                 [
                     "[Peer]",
                     f"PublicKey = {client['public_key']}",
-                    "AllowedIPs = " + ", ".join([f"{client['address']}/32", *peer_options(client)["advertised_routes"]]),
+                    "AllowedIPs = "
+                    + ", ".join([f"{client['address']}/32", *peer_options(client)["advertised_routes"]]),
                     "",
                 ]
             )
@@ -161,8 +165,7 @@ class WireGuardService:
         local = [
             ipaddress.IPv4Network(entry["dst"])
             for entry in entries
-            if entry.get("dst") not in (None, "default")
-            and entry.get("dev") != self._config.wg_interface
+            if entry.get("dst") not in (None, "default") and entry.get("dev") != self._config.wg_interface
         ]
         for route in map(ipaddress.IPv4Network, routes):
             if any(route.overlaps(existing) for existing in local):

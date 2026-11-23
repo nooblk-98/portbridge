@@ -9,6 +9,16 @@ from app.core.peer_options import PRIVATE_ROUTES, peer_options
 from app.core.providers import CommandRunner, ConfigProvider, StorageBackend
 from app.core.rule_renderer import protocols_overlap, render_rule
 
+EGRESS_BLOCKS = (
+    *PRIVATE_ROUTES,
+    "0.0.0.0/8",
+    "127.0.0.0/8",
+    "169.254.0.0/16",
+    "168.63.129.16/32",
+    "192.0.0.0/24",
+    "224.0.0.0/3",
+)
+
 
 class IPTablesService:
     def __init__(self, config: ConfigProvider, storage: StorageBackend, runner: CommandRunner):
@@ -54,7 +64,7 @@ class IPTablesService:
                 rules.append(same_tunnel + ["-s", network, "-d", route, "-j", "ACCEPT"])
                 rules.append(same_tunnel + ["-s", route, "-d", network, *established, "-j", "ACCEPT"])
         if os.environ.get("ALLOW_INTERNET_EGRESS") == "1":
-            for destination in (*PRIVATE_ROUTES, *self._external_connected_routes(ext_iface)):
+            for destination in (*EGRESS_BLOCKS, *self._external_connected_routes(ext_iface)):
                 rules.append(["-i", interface, "-o", ext_iface, "-d", str(destination), "-j", "DROP"])
             rules.append(["-i", interface, "-o", ext_iface, "-s", network, "-j", "ACCEPT"])
             rules.append(["-i", ext_iface, "-o", interface, "-d", network, *established, "-j", "ACCEPT"])
@@ -73,7 +83,14 @@ class IPTablesService:
             ext_iface = self.detect_primary_interface()
             interface = self._config.wg_interface
             network = str(self._config.wg_network)
-            commands = [command for rule in rules for command in render_rule(rule, ext_iface)]
+            clients = self._storage.load_json(str(self._config.clients_file), [])
+            owners = {peer["address"]: peer["public_key"] for peer in clients}
+            active = [
+                rule
+                for rule in rules
+                if rule.get("peer_public_key") and owners.get(str(rule.get("client_ip"))) == rule["peer_public_key"]
+            ]
+            commands = [command for rule in active for command in render_rule(rule, ext_iface)]
             dnat = [command.args for command in commands if command.table == "nat"]
             public = [
                 ["-i", ext_iface, "-o", interface, "-m", "conntrack", "--ctstate", "DNAT", *command.args]
@@ -110,11 +127,7 @@ class IPTablesService:
             parent = "FORWARD"
             self._install_chain("filter", chain, parent, policy)
             self._install_chain("nat", self._config.nat_chain, "PREROUTING", dnat)
-            masquerade = (
-                [["-o", interface, "-m", "conntrack", "--ctstate", "DNAT", "--ctdir", "ORIGINAL", "-j", "MASQUERADE"]]
-                if public
-                else []
-            )
+            masquerade = []
             if os.environ.get("ALLOW_INTERNET_EGRESS") == "1":
                 masquerade.append(["-s", network, "-o", ext_iface, "-j", "MASQUERADE"])
             self._install_chain("nat", self._config.nat_chain + "_POST", "POSTROUTING", masquerade)

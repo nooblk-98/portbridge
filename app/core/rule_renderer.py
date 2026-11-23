@@ -69,6 +69,10 @@ def render_rule(rule: dict, ext_iface: str) -> list[IPTablesCommand]:
             client_ip,
             "--dport",
             dest_port_arg,
+            "-m",
+            "conntrack",
+            "--ctorigdstport",
+            dport_arg,
             "-j",
             "ACCEPT",
         ]
