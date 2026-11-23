@@ -1,0 +1,14 @@
+# Keep the build context to what the image build needs.
+**
+!Dockerfile
+!Cargo.toml
+!Cargo.lock
+!src/
+!src/**
+!app/
+!app/**
+
+# Static files and templates only: no Python sources or bytecode in the image.
+app/**/*.py
+app/**/__pycache__/
+app/**/*.pyc

@@ -29,6 +29,9 @@ env/
 ENV/
 .env
 
+# Rust
+/target/
+
 # IDE
 .idea/
 .vscode/
@@ -42,3 +45,8 @@ docker-compose.override.yml
 data/
 *.log
 skills-lock.json
+
+# Rust
+/target/
+
+/.venv/

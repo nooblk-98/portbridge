@@ -4,12 +4,13 @@ PortBridge connects devices behind NAT or CGNAT to a WireGuard server you contro
 
 ## Install on Debian or Ubuntu without Docker
 
-Use a dedicated server with systemd, sudo access, and a public IP address or DNS name. Allow inbound UDP 51820 in your server and provider firewalls.
+Use a dedicated server with systemd, sudo access, and a public IP address or DNS name. For a source install, install `build-essential` with apt, then install Rust 1.85 or newer and Cargo through rustup as your regular user. A trusted prebuilt binary for your architecture can be used in place of the build step. Allow inbound UDP 51820 in your server and provider firewalls.
 
 ```sh
 git clone https://github.com/nooblk-98/portbridge.git
 cd portbridge
-sudo bash install.sh vpn.example.com
+cargo build --release --locked --bin portbridge
+sudo PORTBRIDGE_BINARY="$PWD/target/release/portbridge" bash install.sh vpn.example.com
 ```
 
 The installer is for fresh installations and prompts for a dashboard password of 16–128 letters or numbers. It starts the `portbridge` service. It uses the `pb0` WireGuard interface and keeps peer data in `/var/lib/portbridge`. The dashboard listens on localhost. Open an SSH tunnel from your computer, then visit <http://localhost:3000>.
@@ -37,13 +38,19 @@ A device can offer services on its own WireGuard IP. Make sure those services li
 
 You can advertise private IPv4 ranges and the shared address block `100.64.0.0/10`. Advertised routes must be distinct and cannot overlap the VPN subnet or existing server routes. Clearing the route list withdraws the advertisement. Route changes briefly reconnect the server tunnel. PortBridge distributes route changes through updated WireGuard profiles. You can also set DNS, MTU and persistent keepalive per peer. Re-import the relevant profile after changing those options.
 
+## Choose who can reach a route
+
+Open **Routes** to see the advertised addresses, route owners, recent handshakes, and access rules. Select **Edit access** to allow all peers or select specific peers for a route. Leaving the selected list empty blocks other peers from using that route. This setting applies to the advertised address. Peers can still use each other's WireGuard addresses subject to their device firewalls.
+
+The **Split-tunnel profiles** section shows whether the current profile has been exported. After a route or access change, export and re-import updated profiles when prompted. A recent handshake means the owner connected to WireGuard. Test the destination service from a permitted peer to verify reachability.
+
 ## Publish a specific service
 
 Open **Forwarding**, create a rule, and select a public port, protocol, target peer and service port. Set a source IP or CIDR to restrict access when needed. The service sees the original connection source. Its replies must return through WireGuard. When using a split-tunnel profile, configure a return route for the permitted public sources or use a full-tunnel profile. Allow the public port through the server and provider firewalls. For Docker, publish the same port and protocol in Compose.
 
 ## Existing Docker installations
 
-The [Compose example](docker-compose-live.yml) uses the published image. On upgrade, set `WG_HOST` and a strong `ADMIN_PASSWORD` in your Compose environment. Full-tunnel internet access now requires the explicit setting below. Both Compose examples now bind the dashboard to localhost. Use the SSH tunnel above to reach a remote dashboard. Existing Docker volumes contain your peer keys and rules. Keep the volume when upgrading. Save a list of your existing port forwards before upgrading. Older forwards are disabled until you recreate them in the dashboard for the intended peer. Features documented here require an image built from a version that includes them.
+The [Compose example](docker-compose-live.yml) uses the published image. On upgrade, set `WG_HOST` and a strong `ADMIN_PASSWORD` in your Compose environment. Full-tunnel internet access now requires the explicit setting below. Both Compose examples now bind the dashboard to localhost. Use the SSH tunnel above to reach a remote dashboard. Existing Docker volumes contain your peer keys and rules. Keep the volume when upgrading. Sign in again after upgrading from the Python version. Save a list of your existing port forwards before upgrading. Older forwards are disabled until you recreate them in the dashboard for the intended peer. Features documented here require an image built from a version that includes them.
 
 ## Internet access through the VPN
 
