@@ -1,9 +1,7 @@
 name: Release binaries
 
-# Attach static Linux binaries and SHA-256 checksums to a published release.
-# The repository's Release workflow creates releases with GITHUB_TOKEN, and
-# GitHub does not start workflows from GITHUB_TOKEN events, so it also sends
-# the release-completed repository dispatch that this workflow listens for.
+# Build assets for a draft before publication, or attach them when a release
+# is published directly without assets.
 on:
   pull_request:
     paths:
@@ -18,7 +16,7 @@ on:
         required: true
         type: string
   repository_dispatch:
-    types: [release-completed]
+    types: [release-binaries-requested]
 
 permissions:
   contents: read
@@ -36,10 +34,12 @@ jobs:
       contents: read
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
+      sha: ${{ steps.tag.outputs.sha }}
     steps:
       - name: Resolve and validate tag
         id: tag
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           INPUT_TAG: ${{ inputs.tag }}
           DISPATCH_TAG: ${{ github.event.client_payload.tag }}
@@ -54,7 +54,12 @@ jobs:
             echo "::error::Unexpected release tag: $tag"
             exit 1
           fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          sha=$GITHUB_SHA
+          if [[ $EVENT_NAME != pull_request ]]; then
+            sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$tag" --jq .sha)
+          fi
+          [[ $sha =~ ^[0-9a-f]{40}$ ]]
+          printf 'tag=%s\nsha=%s\n' "$tag" "$sha" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build ${{ matrix.arch }} archive
@@ -74,10 +79,10 @@ jobs:
             arch: arm64
             target: aarch64-unknown-linux-musl
     steps:
-      - name: Check out the released tag
+      - name: Check out the resolved commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.sha || format('refs/tags/{0}', needs.metadata.outputs.tag) }}
+          ref: ${{ needs.metadata.outputs.sha }}
           persist-credentials: false
 
       - name: Install static build tools
@@ -163,30 +168,43 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.metadata.outputs.tag }}
+          BUILD_SHA: ${{ needs.metadata.outputs.sha }}
         run: |
           set -euo pipefail
           cd dist
-          archives=(portbridge-*.tar.gz)
-          if [[ ${#archives[@]} -ne 2 ]]; then
-            echo "::error::Expected two release archives, found ${#archives[@]}"
-            exit 1
-          fi
+          archives=("portbridge-${TAG}-linux-x86_64.tar.gz" "portbridge-${TAG}-linux-arm64.tar.gz")
+          assets=("${archives[@]}" SHA256SUMS)
           for archive in "${archives[@]}"; do
             tar -tzf "$archive" >/dev/null
-            if [[ $archive != "portbridge-${TAG}-linux-"* ]]; then
-              echo "::error::Unexpected archive name: $archive"
-              exit 1
-            fi
           done
           sha256sum "${archives[@]}" > SHA256SUMS
-          cat SHA256SUMS
 
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
-          gh release upload "$TAG" "${archives[@]}" SHA256SUMS \
-            --repo "$GITHUB_REPOSITORY" --clobber
+          current_sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$TAG" --jq .sha)
+          if [[ $current_sha != "$BUILD_SHA" ]]; then
+            echo "::error::Release tag moved after the build was resolved"
+            exit 1
+          fi
 
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
-            --json assets --jq '.assets[].name' | sort > uploaded-assets.txt
-          for asset in "${archives[@]}" SHA256SUMS; do
-            grep -qxF "$asset" uploaded-assets.txt
+          uploaded=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets[].name')
+          present=0
+          for asset in "${assets[@]}"; do
+            if grep -qxF "$asset" <<< "$uploaded"; then
+              present=$((present + 1))
+            fi
+          done
+          if [[ $present -eq ${#assets[@]} ]]; then
+            echo "Release assets already exist"
+            exit 0
+          fi
+          if [[ $present -ne 0 ]]; then
+            echo "::error::Only some expected release assets exist; review them before retrying"
+            exit 1
+          fi
+
+          gh release upload "$TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY"
+          uploaded=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets[].name')
+          for asset in "${assets[@]}"; do
+            grep -qxF "$asset" <<< "$uploaded"
           done

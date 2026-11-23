@@ -25,17 +25,18 @@ jobs:
           WITH_V: true      
           RELEASE_BRANCHES: main
 
-      - name: Create GitHub Release
+      - name: Create draft release
         uses: softprops/action-gh-release@v2
         if: steps.tag.outputs.new_tag != ''
         with:
           tag_name: ${{ steps.tag.outputs.new_tag }}
           generate_release_notes: true
+          draft: true
 
-      - name: Trigger Docker Build
+      - name: Request release binaries
         if: steps.tag.outputs.new_tag != ''
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          event-type: release-completed
+          event-type: release-binaries-requested
           client-payload: '{"tag":"${{ steps.tag.outputs.new_tag }}"}'
