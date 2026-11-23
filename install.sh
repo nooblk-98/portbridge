@@ -14,7 +14,6 @@ app_dir=/opt/portbridge
 config_dir=/etc/portbridge
 state_dir=/var/lib/portbridge
 unit=/etc/systemd/system/portbridge.service
-minimum_rust=1.85
 
 # Full IPv6 literal check (RFC 4291), including an embedded IPv4 address.
 ipv6_re='^(([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:)|([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3})|:)|([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3})|:)|([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}))|:)|([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}))|:)|([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}))|:)|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}))|:)))$'
@@ -72,26 +71,13 @@ if [[ ! $password =~ ^[A-Za-z0-9]{16,128}$ ]]; then
     die "Choose a password of 16 to 128 letters or numbers."
 fi
 
+portbridge_bin=${PORTBRIDGE_BINARY:-}
+if [[ -z $portbridge_bin || ! -f $portbridge_bin || ! -x $portbridge_bin ]]; then
+    die "Set PORTBRIDGE_BINARY to an executable from a trusted PortBridge build. See the README for build steps."
+fi
+
 apt-get update
 apt-get install -y ca-certificates iproute2 iptables procps wireguard-tools
-
-portbridge_bin=${PORTBRIDGE_BINARY:-}
-if [[ -n $portbridge_bin ]]; then
-    if [[ ! -f $portbridge_bin || ! -x $portbridge_bin ]]; then
-        die "PORTBRIDGE_BINARY must point to an executable portbridge binary."
-    fi
-elif [[ -x $source_dir/target/release/portbridge ]]; then
-    portbridge_bin=$source_dir/target/release/portbridge
-else
-    if ! command -v cargo >/dev/null; then
-        apt-get install -y cargo
-    fi
-    if ! printf '%s\n%s\n' "$minimum_rust" "$(rustc --version | awk '{print $2}')" | sort -V -C; then
-        die "Rust $minimum_rust or newer is required to build PortBridge. Install it from https://rustup.rs or set PORTBRIDGE_BINARY to a prebuilt binary."
-    fi
-    (cd "$source_dir" && cargo build --release --locked --bin portbridge)
-    portbridge_bin=$source_dir/target/release/portbridge
-fi
 
 install -d -m 0700 "$app_dir" "$config_dir" "$state_dir"
 install -d -m 0750 "$app_dir/app"

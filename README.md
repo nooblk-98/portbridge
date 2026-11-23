@@ -4,12 +4,13 @@ PortBridge connects devices behind NAT or CGNAT to a WireGuard server you contro
 
 ## Install on Debian or Ubuntu without Docker
 
-Use a dedicated server with systemd, sudo access, and a public IP address or DNS name. The installer builds PortBridge with Rust and Cargo. You can supply an existing build with `sudo PORTBRIDGE_BINARY=/path/to/portbridge bash install.sh vpn.example.com`. The running service does not require a language runtime. Allow inbound UDP 51820 in your server and provider firewalls.
+Use a dedicated server with systemd, sudo access, and a public IP address or DNS name. For a source install, first install Rust 1.85 or newer and Cargo as your regular user. A trusted prebuilt binary for your architecture can be used in place of the build step. Allow inbound UDP 51820 in your server and provider firewalls.
 
 ```sh
 git clone https://github.com/nooblk-98/portbridge.git
 cd portbridge
-sudo bash install.sh vpn.example.com
+cargo build --release --locked --bin portbridge
+sudo PORTBRIDGE_BINARY="$PWD/target/release/portbridge" bash install.sh vpn.example.com
 ```
 
 The installer is for fresh installations and prompts for a dashboard password of 16–128 letters or numbers. It starts the `portbridge` service. It uses the `pb0` WireGuard interface and keeps peer data in `/var/lib/portbridge`. The dashboard listens on localhost. Open an SSH tunnel from your computer, then visit <http://localhost:3000>.
