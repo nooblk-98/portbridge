@@ -49,7 +49,4 @@ skills-lock.json
 # Rust
 /target/
 
-# Parity harness working state
-/parity/state/
-/parity/out/
 /.venv/
