@@ -48,9 +48,19 @@ The **Split-tunnel profiles** section shows whether the current profile has been
 
 Open **Forwarding**, create a rule, and select a public port, protocol, target peer and service port. Set a source IP or CIDR to restrict access when needed. The service sees the original connection source. Its replies must return through WireGuard. When using a split-tunnel profile, configure a return route for the permitted public sources or use a full-tunnel profile. Allow the public port through the server and provider firewalls. For Docker, publish the same port and protocol in Compose.
 
-## Existing Docker installations
+## Run with Docker Compose
 
-The [Compose example](docker-compose-live.yml) uses the published image. On upgrade, set `WG_HOST` and a strong `ADMIN_PASSWORD` in your Compose environment. Full-tunnel internet access now requires the explicit setting below. Both Compose examples now bind the dashboard to localhost. Use the SSH tunnel above to reach a remote dashboard. Existing Docker volumes contain your peer keys and rules. Keep the volume when upgrading. Sign in again after upgrading from the Python version. Save a list of your existing port forwards before upgrading. Older forwards are disabled until you recreate them in the dashboard for the intended peer. Features documented here require an image built from a version that includes them.
+Set `WG_HOST` to your server's public hostname or IP and `ADMIN_PASSWORD` to a strong password in a local `.env` file. Start the [published image](docker-compose-live.yml) with:
+
+```sh
+docker compose -f docker-compose-live.yml up -d
+```
+
+To build from this checkout, run `docker compose up -d --build`. Allow UDP 51820 through your server and provider firewalls. The dashboard is at <http://localhost:3000> on the server. Use the SSH tunnel above for remote access.
+
+For a public forwarding rule, add its port and protocol to the Compose `ports` list. For example, add `"30000:30000/tcp"` for TCP port 30000. Carry over any mappings you still use when upgrading.
+
+Keep the same Compose project name and data volume on upgrade. Sign in again after upgrading from Python, and recreate legacy public forwards for the intended peers.
 
 ## Internet access through the VPN
 
