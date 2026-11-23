@@ -1,0 +1,30 @@
+#!/bin/sh
+# Deterministic stand-in for wg used by the parity harness.
+set -eu
+state=${FAKE_STATE:?FAKE_STATE is required}
+mkdir -p "$state"
+printf '%s\n' "wg $*" >>"$state/commands.log"
+case "${1:-}" in
+    genkey)
+        counter_file="$state/genkey.count"
+        count=0
+        [ -f "$counter_file" ] && count=$(cat "$counter_file")
+        count=$((count + 1))
+        printf '%s' "$count" >"$counter_file"
+        printf 'private-key-%s\n' "$count"
+        ;;
+    pubkey)
+        input=$(cat)
+        case "$input" in
+            private-key-*) printf 'public-key-%s\n' "${input#private-key-}" ;;
+            *) printf 'public-key-\n' ;;
+        esac
+        ;;
+    show)
+        # No handshakes or transfers in the synthetic fixture.
+        ;;
+    syncconf)
+        cat >/dev/null
+        ;;
+esac
+exit 0

@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+state=${FAKE_STATE:?FAKE_STATE is required}
+mkdir -p "$state"
+printf '%s\n' "ip $*" >>"$state/commands.log"
+args=" $* "
+case "$args" in
+    *" route show default "*)
+        printf 'default via 192.0.2.1 dev eth0\n'
+        ;;
+    *" -j "*)
+        printf '[]\n'
+        ;;
+esac
+exit 0

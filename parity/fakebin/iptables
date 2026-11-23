@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+state=${FAKE_STATE:?FAKE_STATE is required}
+mkdir -p "$state"
+printf '%s\n' "iptables $*" >>"$state/commands.log"
+# No managed chain exists in the synthetic environment.
+exit 1

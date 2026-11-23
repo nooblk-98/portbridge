@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+state=${FAKE_STATE:?FAKE_STATE is required}
+mkdir -p "$state"
+printf '%s\n' "iptables-restore $*" >>"$state/commands.log"
+cat >>"$state/restore.log"
+printf '\n---\n' >>"$state/restore.log"
+exit 0

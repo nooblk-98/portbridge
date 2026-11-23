@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+state=${FAKE_STATE:?FAKE_STATE is required}
+mkdir -p "$state"
+printf '%s\n' "sysctl $*" >>"$state/commands.log"
+exit 0

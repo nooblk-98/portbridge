@@ -1,0 +1,17 @@
+[request]
+method = "PATCH"
+path = "/api/clients/owner/options"
+body = '{"advertised_routes": ["192.168.50.10/32"], "route_access": {"192.168.50.10/32": ["ghost-public-key"]}, "split_tunnel": false, "dns": "1.1.1.1", "mtu": null, "keepalive": 25}'
+
+[request.headers]
+Content-Type = "application/json"
+Cookie = "session=eyJfdXNlcl9pZCI6IjEiLCJfZnJlc2giOnRydWV9.awRS5A.810KWFjIf3diDmSk55uuSdtcoOA"
+
+[response]
+status = 400
+
+[response.headers]
+content-security-policy = "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+content-type = "application/json"
+set-cookie = "session=eyJfZnJlc2giOmZhbHNlLCJfdXNlcl9pZCI6IjEifQ.[..].[..]; HttpOnly; Path=/; SameSite=Lax"
+vary = "Cookie"

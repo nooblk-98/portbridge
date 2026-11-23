@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+state=${FAKE_STATE:?FAKE_STATE is required}
+mkdir -p "$state"
+printf '%s\n' "wg-quick $*" >>"$state/commands.log"
+case "${1:-}" in
+    strip)
+        [ -f "${2:-}" ] && cat "${2:-}"
+        ;;
+    down|up)
+        ;;
+esac
+exit 0

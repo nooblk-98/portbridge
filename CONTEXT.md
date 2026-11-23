@@ -14,22 +14,30 @@ PortBridge exposes services running on devices behind NAT/CGNAT/Starlink through
 
 **Forwarding rule** — a single port forward entry with protocol (TCP/UDP/both), public port (or range), target peer, internal target port, and optional source IP whitelist.
 
-**Bootstrap** — the initialization sequence run at container startup: ensures directories, generates server keys, seeds a default peer, writes WireGuard config, bounces the WireGuard interface, applies iptables rules.
+**Advertised route** — a private or shared IPv4 range owned by a peer and routed over the tunnel. Another peer can reach it only when route access permits it.
+
+**Route access** — per advertised route, the set of recipient peer public keys allowed to reach it. A missing entry means every connected peer (legacy behaviour); an empty list denies every recipient. The advertising peer can always use its own route.
+
+**Bootstrap** — the initialization sequence run at startup: ensure directories, generate server keys, seed a default peer, write WireGuard config, bounce the interface, apply iptables rules.
 
 ## Technical Structure
 
-**ConfigProvider** — a seam that supplies all configuration values (env vars, paths, secrets). Callers depend on the interface, not module-level globals.
+**Config** — reads the same environment variables and paths as the Python implementation (`DATA_DIR`, `WG_*`, `APP_HOST`, `APP_PORT`, `ADMIN_PASSWORD`). `APP_HOST` defaults to `0.0.0.0`, `APP_PORT` to `3000`.
 
-**CommandRunner** — a seam that wraps subprocess execution. One adapter runs real commands (`SubprocessRunner`); a fake adapter records commands for tests.
+**Storage** — a seam that persists JSON state and text files. `JsonFileStorage` reads/writes the real filesystem; `InMemoryStorage` supports tests.
 
-**StorageBackend** — a seam that persists JSON state and files. One adapter reads/writes the real filesystem (`JsonFileStorage`); an in-memory adapter supports tests.
+**Runner** — a seam that wraps subprocess execution. `SystemRunner` runs real commands; `FakeRunner` records commands and returns canned output.
 
 **RuleRenderer** — a pure module that translates forwarding rule data into structured iptables rule descriptors. No I/O, no subprocess.
 
-**WireGuardService** — the module behind the WireGuard seam. Manages key generation, peer configuration, interface control, and status queries. Depends on `CommandRunner`, `StorageBackend`, and `ConfigProvider`.
+**WireGuardService** — manages key generation, peer configuration, interface control, route overlap checks and status queries. Depends on `Runner`, `Storage` and `Config`.
 
-**IPTablesService** — the module behind the iptables seam. Applies and removes port forwarding rules. Depends on `CommandRunner`, `StorageBackend`, and `ConfigProvider`.
+**IPTablesService** — renders and applies the managed chains with `iptables-restore`, including route access and the default-DROP policy. Depends on `Runner`, `Storage` and `Config`.
 
-**ClientManager** — a service that orchestrates peer lifecycle (create, rename, delete) by coordinating `WireGuardService`, `IPTablesService`, and `StorageBackend`.
+**ClientManager** — orchestrates peer lifecycle (create, rename, options, delete), profile revisions, route-access rollback and bootstrap by coordinating `WireGuardService`, `ForwardingManager` and `Storage`.
 
-**ForwardingManager** — a service that orchestrates port forwarding rule lifecycle (add, remove) by coordinating `IPTablesService`, `StorageBackend`, and `RuleRenderer`.
+**ForwardingManager** — orchestrates port forwarding rule lifecycle (add, remove) by coordinating `IPTablesService`, `Storage` and `RuleRenderer`.
+
+**Auth** — Flask-compatible signed session and remember cookies, constant-time password comparison and the per-IP login rate limit.
+
+**Web** — the axum router, JSON API, Jinja-compatible templates and static assets. Templates and assets are shared with the frontend workstream under `app/templates` and `app/static`.

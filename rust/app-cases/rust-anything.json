@@ -1,0 +1,11 @@
+{
+  "schema": "rust-anything/app-cases@1",
+  "name": "run_python",
+  "run": [
+    "bash",
+    "parity/run_python.sh",
+    "{port}"
+  ],
+  "timeout_secs": 30,
+  "http": {}
+}

@@ -1,0 +1,15 @@
+[request]
+method = "GET"
+path = "/api/clients?step=selected"
+
+[request.headers]
+Cookie = "session=eyJfdXNlcl9pZCI6IjEiLCJfZnJlc2giOnRydWV9.awRS5A.810KWFjIf3diDmSk55uuSdtcoOA"
+
+[response]
+status = 200
+
+[response.headers]
+content-security-policy = "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+content-type = "application/json"
+set-cookie = "session=eyJfZnJlc2giOmZhbHNlLCJfdXNlcl9pZCI6IjEifQ.[..].[..]; HttpOnly; Path=/; SameSite=Lax"
+vary = "Cookie"
