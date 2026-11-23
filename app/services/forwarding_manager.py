@@ -12,7 +12,17 @@ class ForwardingManager:
         self._config = config
 
     def list_rules(self) -> list[dict]:
-        return self._ipt.load_forwardings()
+        rules = self._ipt.load_forwardings()
+        owners = self._owners()
+        return [
+            rule
+            for rule in rules
+            if rule.get("peer_public_key") and owners.get(str(rule.get("client_ip"))) == rule["peer_public_key"]
+        ]
+
+    def _owners(self):
+        clients = self._storage.load_json(str(self._config.clients_file), [])
+        return {client["address"]: client["public_key"] for client in clients}
 
     def add_rule(self, data: dict) -> dict:
         try:
@@ -48,12 +58,9 @@ class ForwardingManager:
         source_ip = data.get("source_ip")
         if source_ip:
             try:
-                ipaddress.ip_address(source_ip)
+                source_ip = str(ipaddress.IPv4Network(source_ip, strict=False))
             except ValueError:
-                try:
-                    ipaddress.ip_network(source_ip)
-                except ValueError:
-                    raise ValueError("Invalid source IP/CIDR.") from None
+                raise ValueError("Invalid IPv4 source IP/CIDR.") from None
 
         target_port_raw = data.get("target_port") or port
         try:
@@ -63,6 +70,10 @@ class ForwardingManager:
 
         if client_ip not in self._config.wg_network:
             raise ValueError("client_ip outside WireGuard network.")
+
+        owner = self._owners().get(str(client_ip))
+        if owner is None:
+            raise ValueError("Select an existing WireGuard peer.")
 
         reserved_ports = [self._config.wg_port, self._config.app_port]
         conflict = False
@@ -78,20 +89,21 @@ class ForwardingManager:
         if conflict:
             raise ValueError(f"Cannot forward reserved system ports ({', '.join(map(str, reserved_ports))}).")
 
-        rules = self._ipt.load_forwardings()
-        for rule in rules:
+        for rule in self.list_rules():
             existing_proto = rule.get("protocol", "both")
             existing_port = str(rule.get("port", -1))
             if existing_port == str(port) and protocols_overlap(existing_proto, proto):
                 if str(rule.get("client_ip")) != str(client_ip):
                     raise ValueError("Port is already in use by another client.")
 
+        rules = self._ipt.load_forwardings()
         rules = [r for r in rules if not (str(r.get("port", -1)) == str(port) and r.get("protocol", "both") == proto)]
         rules.append(
             {
                 "port": port,
                 "protocol": proto,
                 "client_ip": str(client_ip),
+                "peer_public_key": owner,
                 "target_port": target_port,
                 "source_ip": source_ip,
             }
@@ -114,8 +126,18 @@ class ForwardingManager:
     def seed_if_empty(self, default_client_ip: str) -> None:
         rules = self._ipt.load_forwardings()
         if not rules:
-            seed = [{"port": 30000, "protocol": "both", "client_ip": str(default_client_ip), "target_port": 8080}]
-            self._storage.save_json(str(self._config.forward_file), seed)
+            owner = self._owners().get(default_client_ip)
+            if owner:
+                seed = [
+                    {
+                        "port": 30000,
+                        "protocol": "both",
+                        "client_ip": default_client_ip,
+                        "peer_public_key": owner,
+                        "target_port": 8080,
+                    }
+                ]
+                self._storage.save_json(str(self._config.forward_file), seed)
 
     def apply_all(self):
         rules = self._ipt.load_forwardings()

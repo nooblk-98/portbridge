@@ -3,12 +3,12 @@ services:
     build: .  
     container_name: wg-forwarder
     environment:
-      - WG_HOST=202.124.164.163
+      - WG_HOST=${WG_HOST:?Set WG_HOST to your public hostname or IP}
       - WG_PORT=51820
       - WG_NETWORK=10.8.0.0/24
       - WG_ADDRESS=10.8.0.1/24
       - APP_PORT=3000
-      - ADMIN_PASSWORD=admin
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Set ADMIN_PASSWORD before starting PortBridge}
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
@@ -17,7 +17,7 @@ services:
       - net.ipv4.conf.all.src_valid_mark=1
     ports:
       - "51820:51820/udp"
-      - "3000:3000/tcp"
+      - "127.0.0.1:3000:3000/tcp"
       - "30000-30100:30000-30100/tcp"
     volumes:
       - wg-data:/data

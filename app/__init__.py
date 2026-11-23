@@ -19,6 +19,8 @@ def create_app():
     )
 
     config = EnvConfigProvider()
+    if not config.admin_password or config.admin_password == "admin":
+        raise RuntimeError("Set ADMIN_PASSWORD to a non-default password before starting PortBridge.")
     storage = JsonFileStorage(base_dir=str(config.data_dir))
     runner = SubprocessRunner()
 
@@ -27,10 +29,21 @@ def create_app():
     forwarding_manager = ForwardingManager(ipt=ipt_service, storage=storage, config=config)
     client_manager = ClientManager(wg=wg_service, storage=storage, config=config, fwd=forwarding_manager)
 
-    bootstrap(client_manager, forwarding_manager)
+    bootstrap(client_manager)
 
     app = Flask(__name__)
     app.secret_key = config.secret_key
+    app.config.update(SESSION_COOKIE_SAMESITE="Lax", REMEMBER_COOKIE_SAMESITE="Lax")
+
+    @app.after_request
+    def security_headers(response):
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; "
+            "object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        )
+        return response
 
     app.extensions["config"] = config
     app.extensions["client_manager"] = client_manager

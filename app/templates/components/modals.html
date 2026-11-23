@@ -283,3 +283,40 @@
         </div>
     </div>
 </div>
+
+<div x-show="modals.options" x-cloak role="dialog" aria-modal="true" aria-labelledby="peer-settings-title"
+    @keydown.escape.window="if (!loading.options) modals.options = false"
+    class="fixed inset-0 z-50 overflow-y-auto bg-black/50 px-4 py-8">
+    <form @submit.prevent="savePeerOptions"
+        class="mx-auto max-w-md space-y-4 rounded-2xl bg-white p-6 dark:bg-dark-surface dark:text-white">
+        <h3 id="peer-settings-title" class="text-xl font-bold">Peer settings</h3>
+        <label class="block">
+            <span>Advertised IPv4 hosts or subnets</span>
+            <textarea x-model="forms.options.routes" placeholder="192.168.50.10, 192.168.60.0/24"
+                class="w-full rounded-xl dark:bg-dark-bg"></textarea>
+        </label>
+        <p class="text-sm">Connected peers can reach these addresses through this peer. Clear the list to disable advertising.</p>
+        <label class="block">
+            <input type="checkbox" x-model="forms.options.split_tunnel">
+            Split tunnel (VPN and advertised routes only)
+        </label>
+        <label class="block">
+            <span>DNS servers (optional)</span>
+            <input x-model="forms.options.dns" class="w-full rounded-xl dark:bg-dark-bg">
+        </label>
+        <label class="block">
+            <span>MTU (blank for automatic)</span>
+            <input type="number" min="1280" max="9000" x-model.number="forms.options.mtu"
+                class="w-full rounded-xl dark:bg-dark-bg">
+        </label>
+        <label class="block">
+            <span>Keepalive in seconds (0 disables it)</span>
+            <input type="number" min="0" max="65535" required x-model.number="forms.options.keepalive"
+                class="w-full rounded-xl dark:bg-dark-bg">
+        </label>
+        <div class="flex justify-end gap-3">
+            <button type="button" @click="modals.options = false" :disabled="loading.options" class="px-4 py-2">Cancel</button>
+            <button type="submit" :disabled="loading.options" class="rounded-xl bg-primary-600 px-4 py-2 text-white">Save</button>
+        </div>
+    </form>
+</div>

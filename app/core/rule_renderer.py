@@ -24,7 +24,9 @@ def render_rule(rule: dict, ext_iface: str) -> list[IPTablesCommand]:
             dport_arg = str(port)
 
         proto = rule.get("protocol", "both").lower()
-        client_ip = str(ipaddress.ip_address(rule["client_ip"]))
+        if proto not in ("tcp", "udp", "both"):
+            return []
+        client_ip = str(ipaddress.IPv4Address(rule["client_ip"]))
 
         if is_range:
             to_dest = f"{client_ip}:{start_port}-{end_port}"
@@ -35,6 +37,8 @@ def render_rule(rule: dict, ext_iface: str) -> list[IPTablesCommand]:
             dest_port_arg = str(target_port)
 
         source_ip = (rule.get("source_ip") or "").strip()
+        if source_ip:
+            source_ip = str(ipaddress.IPv4Network(source_ip, strict=False))
 
     except Exception as e:
         logging.error("Skipping invalid rule %s: %s", rule, e)
@@ -65,6 +69,10 @@ def render_rule(rule: dict, ext_iface: str) -> list[IPTablesCommand]:
             client_ip,
             "--dport",
             dest_port_arg,
+            "-m",
+            "conntrack",
+            "--ctorigdstport",
+            dport_arg,
             "-j",
             "ACCEPT",
         ]

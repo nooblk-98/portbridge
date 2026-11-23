@@ -14,6 +14,7 @@ function app() {
             client: false,
             fwd: false,
             qr: false,
+            options: false,
             rename: false,
             confirmDelete: false,
             confirmDeleteFwd: false,
@@ -22,6 +23,7 @@ function app() {
         forms: {
             client: { name: '', address: '' },
             fwd: { port: '', target_port: '', protocol: 'both', client_ip: '', source_ip: '' },
+            options: {},
             rename: { oldName: '', newName: '' },
         },
 
@@ -30,6 +32,7 @@ function app() {
         loading: {
             createClient: false,
             createFwd: false,
+            options: false,
             rename: false,
             delete: false,
         },
@@ -152,6 +155,37 @@ function app() {
         showQR(client) {
             this.activeClient = client;
             this.modals.qr = true;
+        },
+
+        openPeerOptions(client) {
+            this.forms.options = {
+                ...client.options,
+                name: client.name,
+                routes: client.options.advertised_routes.join(', '),
+            };
+            this.modals.options = true;
+        },
+
+        async savePeerOptions() {
+            this.loading.options = true;
+            const { name, routes, ...options } = this.forms.options;
+            options.advertised_routes = routes.split(/[\s,]+/).filter(Boolean);
+            options.mtu = options.mtu === '' ? null : options.mtu;
+            try {
+                await fetch(`/api/clients/${encodeURIComponent(name)}/options`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(options),
+                }).then(this.checkAuth);
+                this.modals.options = false;
+                this.showToast('Peer settings saved. Download the updated profile.');
+                await this.loadData();
+            } catch (error) {
+                const details = error instanceof Response ? await error.json().catch(() => null) : null;
+                this.showToast(details?.description || 'Could not save peer settings', 'error');
+            } finally {
+                this.loading.options = false;
+            }
         },
 
         openRenameModal(client) {

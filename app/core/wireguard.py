@@ -1,8 +1,10 @@
 import ipaddress
+import json
 import logging
 import os
 import time
 
+from app.core.peer_options import peer_options
 from app.core.providers import CommandRunner, ConfigProvider, StorageBackend
 
 
@@ -50,19 +52,35 @@ class WireGuardService:
                 continue
         return clients
 
-    def write_client_config(self, client: dict, server_public: str):
+    def write_client_config(self, client: dict, server_public: str, clients=()):
+        options = peer_options(client)
+        routes = ["0.0.0.0/0"]
+        if options["split_tunnel"]:
+            routes = [str(self._config.wg_network)]
+            for peer in clients:
+                if peer["name"] != client["name"]:
+                    routes.extend(peer_options(peer)["advertised_routes"])
+        interface = [
+            "[Interface]",
+            f"PrivateKey = {client['private_key']}",
+            f"Address = {client['address']}/{self._config.wg_network.prefixlen}",
+        ]
+        if options["dns"]:
+            interface.append(f"DNS = {options['dns']}")
+        if options["mtu"] is not None:
+            interface.append(f"MTU = {options['mtu']}")
+        host = self._config.wg_host
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
         cfg = "\n".join(
-            [
-                "[Interface]",
-                f"PrivateKey = {client['private_key']}",
-                f"Address = {client['address']}/{self._config.wg_network.prefixlen}",
-                "DNS = 1.1.1.1",
+            interface
+            + [
                 "",
                 "[Peer]",
                 f"PublicKey = {server_public}",
-                f"Endpoint = {self._config.wg_host}:{self._config.wg_port}",
-                "AllowedIPs = 0.0.0.0/0",
-                "PersistentKeepalive = 25",
+                f"Endpoint = {host}:{self._config.wg_port}",
+                f"AllowedIPs = {', '.join(routes)}",
+                f"PersistentKeepalive = {options['keepalive']}",
                 "",
             ]
         )
@@ -96,7 +114,8 @@ class WireGuardService:
                 [
                     "[Peer]",
                     f"PublicKey = {client['public_key']}",
-                    f"AllowedIPs = {client['address']}/32",
+                    "AllowedIPs = "
+                    + ", ".join([f"{client['address']}/32", *peer_options(client)["advertised_routes"]]),
                     "",
                 ]
             )
@@ -114,8 +133,10 @@ class WireGuardService:
             logging.info("WireGuard status:\n%s", payload.strip())
 
     def bounce_interface(self):
-        self._runner.run(["wg-quick", "down", self._config.wg_interface], check=False)
-        self._runner.run(["wg-quick", "up", self._config.wg_interface])
+        self._runner.run(["wg-quick", "down", str(self._config.wg_config_path)], check=False)
+        self._runner.run(["wg-quick", "up", str(self._config.wg_config_path)])
+        if os.environ.get("ENABLE_IPV4_FORWARDING") == "1":
+            self._runner.run(["sysctl", "-w", "net.ipv4.ip_forward=1"])
         self.log_wireguard_status()
 
     def seamless_reload(self):
@@ -132,6 +153,38 @@ class WireGuardService:
         self.render_wireguard_config(clients, server_private)
         self.seamless_reload()
         logging.info("Reloaded WireGuard with %s clients", len(clients))
+
+    def check_local_routes(self, routes):
+        if not routes:
+            return
+        output = self._runner.run(["ip", "-j", "-4", "route", "show", "table", "all"]).stdout
+        try:
+            entries = json.loads(output)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("Unable to read server IPv4 routes.") from exc
+        local = [
+            ipaddress.IPv4Network(entry["dst"])
+            for entry in entries
+            if entry.get("dst") not in (None, "default") and entry.get("dev") != self._config.wg_interface
+        ]
+        for route in map(ipaddress.IPv4Network, routes):
+            if any(route.overlaps(existing) for existing in local):
+                raise ValueError(f"Advertised route overlaps a server route: {route}")
+
+    def replace_routes(self, previous, clients):
+        server_private, _ = self.ensure_server_keys()
+        path = str(self._config.wg_config_path)
+        self._runner.run(["wg-quick", "down", path])
+        try:
+            self.render_wireguard_config(clients, server_private)
+            self._runner.run(["wg-quick", "up", path])
+        except Exception:
+            try:
+                self.render_wireguard_config(previous, server_private)
+                self._runner.run(["wg-quick", "up", path])
+            except Exception:
+                logging.exception("Could not restore the previous WireGuard configuration")
+            raise
 
     def peer_status_map(self) -> dict:
         status = {}

@@ -1,193 +1,50 @@
-<div align="center">
-  <img src="./images/logo/logo.png" width="360" alt="PortBridge logo" />
+# PortBridge
 
-  # PortBridge
+PortBridge connects devices behind NAT or CGNAT to a WireGuard server you control. Use **Peer settings** to reach a host or subnet privately over WireGuard. Use **Forwarding** when a service needs to be reachable from the internet on a public TCP or UDP port.
 
-  Self-hosted WireGuard VPN manager with a dynamic port forwarding web UI.
-  Expose services behind NAT/CGNAT without a public IP.
+## Install on Debian or Ubuntu without Docker
 
-  <div>
-    <a href="https://hub.docker.com/r/lahiru98s/portbridge"><img src="https://img.shields.io/docker/pulls/lahiru98s/portbridge?style=flat-square" alt="Docker pulls" /></a>
-    <a href="https://github.com/nooblk-98/portbridge/releases"><img src="https://img.shields.io/github/v/release/nooblk-98/portbridge?style=flat-square&logo=github" alt="GitHub release" /></a>
-    <a href="https://github.com/nooblk-98/portbridge/actions/workflows/publish.yml"><img src="https://github.com/nooblk-98/portbridge/actions/workflows/publish.yml/badge.svg?style=flat-square" alt="CI status" /></a>
-    <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-  </div>
+Use a dedicated server with systemd, sudo access, and a public IP address or DNS name. Allow inbound UDP 51820 in your server and provider firewalls.
 
-  ⭐ If you like this project, star it on GitHub — it helps a lot!
-
-  [Overview](#overview) • [How it works](#how-it-works) • [Features](#features) • [Getting started](#getting-started) • [Usage](#usage) • [Configuration](#configuration) • [Screenshots](#screenshots)
-
-</div>
-
-## Overview
-
-PortBridge is a lightweight, Docker-based tool that lets you expose services running on devices behind NAT, CGNAT, Starlink, or dynamic residential IPs through a public VPS. It combines a WireGuard VPN server with an iptables-based port forwarder, all managed through a clean web UI.
-
-> [!TIP]
-> No static public IP needed on the client side. As long as your device can initiate outbound connections, PortBridge can make its services reachable.
-
-## How it works
-
-You run PortBridge on a VPS with a public IP. Client devices connect to it over a WireGuard tunnel. PortBridge forwards traffic from public ports on the VPS through the tunnel to specific services on those devices.
-
-```mermaid
-graph LR
-    User[External User] -- "Public IP:20000" --> VPS["VPS (PortBridge)"]
-    subgraph "WireGuard Tunnel"
-    VPS -- "10.8.0.1 <--> 10.8.0.2" --> Client["Home Server/PC"]
-    end
-    Client -- "Localhost:80" --> Service["Web Service"]
+```sh
+git clone https://github.com/nooblk-98/portbridge.git
+cd portbridge
+sudo bash install.sh vpn.example.com
 ```
 
-```mermaid
-sequenceDiagram
-    participant User as External User
-    participant Server as VPS (Public IP)
-    participant Client as Home Device (No Public IP)
+The installer is for fresh installations and prompts for a dashboard password of 16–128 letters or numbers. It starts the `portbridge` service. It uses the `pb0` WireGuard interface and keeps peer data in `/var/lib/portbridge`. The dashboard listens on localhost. Open an SSH tunnel from your computer, then visit <http://localhost:3000>.
 
-    Note over Client, Server: 1. Client establishes WireGuard tunnel
-    Client->>Server: Handshake (PersistentKeepalive=25s)
-
-    Note over User, Server: 2. User accesses the service
-    User->>Server: Connect to VPS Public IP:Port
-    Server->>Server: iptables DNAT → Client WG IP
-    Server->>Client: Forward traffic via tunnel
-    Client->>Client: Service processes request
-    Client->>Server: Response via tunnel
-    Server->>User: Response to user
+```sh
+ssh -N -L 3000:127.0.0.1:3000 user@vpn.example.com
 ```
 
-## Features
+For service status, run `sudo systemctl status portbridge`. For logs, run `sudo journalctl -u portbridge -e`.
 
-- **WireGuard peer management** — Full CRUD for clients via a clean web UI with online/offline status, handshake times, and bandwidth usage (RX/TX).
-- **Dynamic port forwarding** — Forward any TCP/UDP port from the VPS to connected clients. Changes apply in real time via iptables without restarting WireGuard.
-- **Port range support** — Forward entire ranges (e.g., `8000-8100`) for gaming servers or multi-port applications.
-- **Source IP whitelisting** — Restrict access to forwarded ports by source IP or CIDR for enhanced security.
-- **QR code provisioning** — One-click QR code generation for mobile WireGuard client setup.
-- **Seamless peer reload** — Uses `wg syncconf` for hot-reloading peers without disconnecting existing clients (falls back to `wg-quick` bounce if needed).
-- **Dark mode** — Full dark theme persisted to local storage.
-- **Lightweight & Dockerized** — Alpine-based container (~300 MB), minimal Python dependencies (Flask + 3 libraries).
-- **Multi-arch images** — Published for both `linux/amd64` and `linux/arm64` on Docker Hub and GitHub Container Registry.
+## Connect a device
 
-## Getting started
+1. Sign in to the dashboard and create a peer under **Clients**.
+2. Download its WireGuard configuration or scan the QR code with the [WireGuard app](https://www.wireguard.com/install/).
+3. Activate the tunnel. Under **Clients**, check for a recent handshake.
 
-### Prerequisites
+A device can offer services on its own WireGuard IP. Make sure those services listen on the tunnel address and the device firewall allows traffic from the VPN.
 
-- A VPS with a public IP (Ubuntu/Debian recommended)
-- Docker and Docker Compose installed
-- Root access (required for `NET_ADMIN`, `SYS_MODULE` capabilities, and `iptables`)
+## Share a host or subnet privately
 
-### Quick deploy
+1. Open **Clients → Peer settings** for the device that owns or can reach the host.
+2. Enter an IPv4 address such as `192.168.50.10` to share one host or a CIDR such as `192.168.50.0/24` to share a subnet. Save the settings.
+3. If the destination is behind the advertising device, enable IP forwarding on that device, allow forwarding in its firewall, and add a return route to the WireGuard subnet through that device (or configure source NAT there).
+4. For receiving peers using **Split tunnel**, re-import their updated configuration so the new destination is routed over WireGuard. Then connect to the destination IP and its normal service port.
 
-```bash
-wget -O docker-compose.yml https://raw.githubusercontent.com/nooblk-98/portbridge/refs/heads/main/docker-compose.live.yml && docker compose up -d
-```
+You can advertise private IPv4 ranges and the shared address block `100.64.0.0/10`. Advertised routes must be distinct and cannot overlap the VPN subnet or existing server routes. Clearing the route list withdraws the advertisement. Route changes briefly reconnect the server tunnel. PortBridge distributes route changes through updated WireGuard profiles. You can also set DNS, MTU and persistent keepalive per peer. Re-import the relevant profile after changing those options.
 
-### Manual setup
+## Publish a specific service
 
-Create a `docker-compose.yml`:
+Open **Forwarding**, create a rule, and select a public port, protocol, target peer and service port. Set a source IP or CIDR to restrict access when needed. The service sees the original connection source. Its replies must return through WireGuard. When using a split-tunnel profile, configure a return route for the permitted public sources or use a full-tunnel profile. Allow the public port through the server and provider firewalls. For Docker, publish the same port and protocol in Compose.
 
-```yaml
-services:
-  portbridge:
-    image: lahiru98s/portbridge:latest
-    container_name: portbridge
-    environment:
-      WG_HOST: 203.0.113.10         # Required: your VPS public IP
-      ADMIN_PASSWORD: changeme       # Required: web UI password
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv4.conf.all.src_valid_mark=1
-    ports:
-      - "51820:51820/udp"          # WireGuard
-      - "3000:3000/tcp"            # Web UI
-      - "30000-30100:30000-30100/tcp"  # Port forwarding range (optional)
-    volumes:
-      - wg-data:/data
-      - /lib/modules:/lib/modules:ro
-    restart: unless-stopped
+## Existing Docker installations
 
-volumes:
-  wg-data:
-```
+The [Compose example](docker-compose-live.yml) uses the published image. On upgrade, set `WG_HOST` and a strong `ADMIN_PASSWORD` in your Compose environment. Full-tunnel internet access now requires the explicit setting below. Both Compose examples now bind the dashboard to localhost. Use the SSH tunnel above to reach a remote dashboard. Existing Docker volumes contain your peer keys and rules. Keep the volume when upgrading. Save a list of your existing port forwards before upgrading. Older forwards are disabled until you recreate them in the dashboard for the intended peer. Features documented here require an image built from a version that includes them.
 
-Then start the container:
+## Internet access through the VPN
 
-```bash
-docker compose up -d
-```
-
-> [!IMPORTANT]
-> You must set `WG_HOST` to your VPS public IP address for clients to connect. The default `ADMIN_PASSWORD` is `admin` — change it in production.
-
-## Usage
-
-### 1. Create a client
-
-1. Open the web UI at `http://<vps-ip>:3000` and log in.
-2. Go to the **Clients** tab and click **New Client**.
-3. Enter a name (e.g., `home-server`) and click **Create**.
-
-### 2. Configure the client device
-
-1. Click the download icon on the client card to get the `.conf` file, or view the QR code for mobile setup.
-2. Import the config into the [WireGuard client](https://www.wireguard.com/install/) on your device.
-3. On Linux: copy the file to `/etc/wireguard/wg0.conf` and run `wg-quick up wg0`.
-
-### 3. Add a port forwarding rule
-
-1. Go to the **Forwarding** tab and click **New Rule**.
-2. Specify:
-   - **Public port** — the port on your VPS (single port or range, e.g., `30000` or `30000-30100`)
-   - **Internal port** — the port your service runs on (e.g., `8080`)
-   - **Protocol** — `TCP`, `UDP`, or `Both`
-   - **Target client** — select the client from the dropdown
-   - **Source IP** (optional) — restrict access to a specific IP or CIDR
-3. Click **Add Rule**.
-
-Your service is now accessible at `http://<vps-ip>:30000`.
-
-## Configuration
-
-All configuration is done through environment variables:
-
-| Variable | Default | Description |
-|---|---|---|
-| `WG_HOST` | `127.0.0.1` | VPS public IP or hostname (required) |
-| `WG_PORT` | `51820` | WireGuard listening UDP port |
-| `WG_NETWORK` | `10.8.0.0/24` | WireGuard tunnel subnet |
-| `WG_ADDRESS` | `10.8.0.1/24` | Server address within the tunnel |
-| `WG_INTERFACE` | `wg0` | WireGuard interface name |
-| `APP_PORT` | `3000` | Web UI port |
-| `ADMIN_PASSWORD` | `admin` | Dashboard login password |
-| `DATA_DIR` | `/data` | Persistent data directory |
-
-## Screenshots
-
-<p align="center">
-  <img src="images/dashboard.png" alt="Dashboard" width="90%" />
-  <br/>
-  <em>Dashboard overview</em>
-</p>
-
-<p align="center">
-  <img src="images/clients.png" alt="Client management" width="90%" />
-  <br/>
-  <em>Client management with online status and bandwidth</em>
-</p>
-
-<p align="center">
-  <img src="images/forwarding.png" alt="Port forwarding" width="90%" />
-  <br/>
-  <em>Port forwarding rules management</em>
-</p>
-
-## Security notes
-
-- The web UI is protected by a login page. Change the default `admin` password.
-- PortBridge uses custom `iptables` chains (`WG_FORWARDER`) that are isolated from your system rules.
-- The WireGuard port (`51820`) and web UI port (`3000`) are reserved and cannot be forwarded through the UI.
-- Ensure your VPS firewall (UFW / cloud security groups) allows the ports you intend to expose.
+The server blocks general peer internet access by default. For devices that only need VPN services, enable split tunneling. To use the server as an internet gateway, set `ALLOW_INTERNET_EGRESS=1` in `/etc/portbridge/portbridge.env` (or in the Compose service environment) and restart PortBridge. Devices with full-tunnel profiles then send their IPv4 internet traffic through the server.

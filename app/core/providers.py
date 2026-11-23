@@ -23,12 +23,10 @@ class SubprocessRunner:
     def run(self, cmd: list[str], *, check: bool = True, input_data: str | None = None) -> CommandResult:
         logger.info("exec: %s", " ".join(cmd))
         result = subprocess.run(cmd, input=input_data, capture_output=True, text=True)
-        if result.stdout.strip():
-            logger.info(result.stdout.strip())
         if result.stderr.strip():
             logger.warning(result.stderr.strip())
         if check and result.returncode != 0:
-            raise RuntimeError(f"Command failed: {' '.join(cmd)}\nstdout: {result.stdout}\nstderr: {result.stderr}")
+            raise RuntimeError(f"Command failed with exit {result.returncode}: {' '.join(cmd)}")
         return CommandResult(returncode=result.returncode, stdout=result.stdout, stderr=result.stderr)
 
 
