@@ -50,7 +50,7 @@ Open **Forwarding**, create a rule, and select a public port, protocol, target p
 
 ## Existing Docker installations
 
-The [Compose example](docker-compose-live.yml) uses the published image. On upgrade, set `WG_HOST` and a strong `ADMIN_PASSWORD` in your Compose environment. Full-tunnel internet access now requires the explicit setting below. Both Compose examples now bind the dashboard to localhost. Use the SSH tunnel above to reach a remote dashboard. Existing Docker volumes contain your peer keys and rules. Keep the volume when upgrading. Save a list of your existing port forwards before upgrading. Older forwards are disabled until you recreate them in the dashboard for the intended peer. Features documented here require an image built from a version that includes them.
+The [Compose example](docker-compose-live.yml) uses the published image. On upgrade, set `WG_HOST` and a strong `ADMIN_PASSWORD` in your Compose environment. Full-tunnel internet access now requires the explicit setting below. Both Compose examples now bind the dashboard to localhost. Use the SSH tunnel above to reach a remote dashboard. Existing Docker volumes contain your peer keys and rules. Keep the volume when upgrading. Sign in again after upgrading from the Python version. Save a list of your existing port forwards before upgrading. Older forwards are disabled until you recreate them in the dashboard for the intended peer. Features documented here require an image built from a version that includes them.
 
 ## Internet access through the VPN
 

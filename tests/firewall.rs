@@ -263,7 +263,7 @@ fn restore_count(setup: &Setup) -> usize {
 }
 
 #[test]
-fn egress_route_discovery_failure_keeps_the_running_policy() {
+fn egress_route_discovery_failure_replaces_the_running_policy_with_tunnel_drops() {
     let setup = Setup::new();
     setup.seed_keys();
     setup.store(&[client("owner", "10.8.0.2", "owner-public")]);
@@ -276,11 +276,7 @@ fn egress_route_discovery_failure_keeps_the_running_policy() {
         .apply_forwardings(&[])
         .expect_err("discovery failure");
     assert!(error.to_string().contains("directly connected"), "{error}");
-    assert_eq!(
-        restore_count(&setup),
-        installed,
-        "policy must not be replaced"
-    );
+    assert_eq!(restore_count(&setup), installed + 1);
 
     setup
         .runner
@@ -289,11 +285,17 @@ fn egress_route_discovery_failure_keeps_the_running_policy() {
         .apply_forwardings(&[])
         .expect_err("invalid discovery output");
     assert!(error.to_string().contains("directly connected"), "{error}");
-    assert_eq!(
-        restore_count(&setup),
-        installed,
-        "policy must not be replaced"
-    );
+    assert_eq!(restore_count(&setup), installed + 2);
+    let guard = setup
+        .runner
+        .calls()
+        .into_iter()
+        .rev()
+        .find_map(|(cmd, input)| (cmd[0] == "iptables-restore").then_some(input).flatten())
+        .expect("fail-closed firewall restore");
+    assert!(guard.contains("-i wg0 -j DROP"));
+    assert!(guard.contains("-o wg0 -j DROP"));
+    assert!(!guard.contains("-j ACCEPT"));
 }
 
 #[test]

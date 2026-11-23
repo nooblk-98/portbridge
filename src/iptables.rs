@@ -57,7 +57,7 @@ impl IPTablesService {
         ];
         if let Ok(result) = self.runner.run(&command, false, None) {
             let iface = result.stdout.trim();
-            if !iface.is_empty() {
+            if result.returncode == 0 && !iface.is_empty() {
                 return Ok(iface.to_string());
             }
         }
@@ -261,9 +261,30 @@ impl IPTablesService {
         Ok(routes)
     }
 
+    fn discovered_or_block<T>(&self, result: Result<T, AppError>) -> Result<T, AppError> {
+        result.or_else(|error| {
+            self.install_chain(
+                "filter",
+                &self.config.filter_chain,
+                "FORWARD",
+                &self.tunnel_drops(),
+            )?;
+            Err(error)
+        })
+    }
+
+    fn tunnel_drops(&self) -> [Vec<String>; 2] {
+        ["-i", "-o"].map(|direction| {
+            [direction, &self.config.wg_interface, "-j", "DROP"]
+                .map(str::to_owned)
+                .to_vec()
+        })
+    }
+
     pub fn apply_forwardings(&self, rules: &[Value]) -> Result<(), AppError> {
         let _guard = self.lock.lock().expect("iptables lock");
-        let ext_iface = self.detect_primary_interface()?;
+        let ext_iface = self.discovered_or_block(self.detect_primary_interface())?;
+        let routing = self.discovered_or_block(self.routing_rules(&ext_iface))?;
         let interface = self.config.wg_interface.clone();
         let network = self.config.wg_network.to_string();
         let raw = self
@@ -342,19 +363,8 @@ impl IPTablesService {
             ]);
         }
         let mut policy = public;
-        policy.extend(self.routing_rules(&ext_iface)?);
-        policy.push(vec![
-            "-i".to_string(),
-            interface.clone(),
-            "-j".to_string(),
-            "DROP".to_string(),
-        ]);
-        policy.push(vec![
-            "-o".to_string(),
-            interface.clone(),
-            "-j".to_string(),
-            "DROP".to_string(),
-        ]);
+        policy.extend(routing);
+        policy.extend(self.tunnel_drops());
         self.install_chain("filter", &self.config.filter_chain, "FORWARD", &policy)?;
         self.install_chain("nat", &self.config.nat_chain, "PREROUTING", &dnat)?;
         let mut masquerade = Vec::new();
