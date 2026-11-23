@@ -1,0 +1,192 @@
+name: Release binaries
+
+# Attach static Linux binaries and SHA-256 checksums to a published release.
+# The repository's Release workflow creates releases with GITHUB_TOKEN, and
+# GitHub does not start workflows from GITHUB_TOKEN events, so it also sends
+# the release-completed repository dispatch that this workflow listens for.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/release-binaries.yml
+      - install.sh
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to attach binaries to, for example v1.0.0
+        required: true
+        type: string
+  repository_dispatch:
+    types: [release-completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-binaries-${{ github.event.release.tag_name || github.event.client_payload.tag || inputs.tag || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    name: Resolve release tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Resolve and validate tag
+        id: tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          DISPATCH_TAG: ${{ github.event.client_payload.tag }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          tag=${RELEASE_TAG:-${INPUT_TAG:-${DISPATCH_TAG:-}}}
+          if [[ $EVENT_NAME == pull_request ]]; then
+            tag=v0.0.0-ci
+          fi
+          if [[ ! $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Unexpected release tag: $tag"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.arch }} archive
+    needs: metadata
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+            target: x86_64-unknown-linux-musl
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            target: aarch64-unknown-linux-musl
+    steps:
+      - name: Check out the released tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.sha || format('refs/tags/{0}', needs.metadata.outputs.tag) }}
+          persist-credentials: false
+
+      - name: Install static build tools
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends musl-tools
+          rustup target add "$TARGET"
+
+      # A musl static binary runs on Debian and Ubuntu without depending on
+      # the runner image's glibc version.
+      - name: Build release binary
+        env:
+          TARGET: ${{ matrix.target }}
+        run: cargo build --release --locked --bin portbridge --target "$TARGET"
+
+      - name: Verify binary architecture
+        env:
+          ARCH: ${{ matrix.arch }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          binary="target/${TARGET}/release/portbridge"
+          file "$binary"
+          case "$ARCH" in
+            x86_64) expected='x86-64' ;;
+            arm64) expected='ARM aarch64' ;;
+            *) echo "::error::Unknown architecture: $ARCH"; exit 1 ;;
+          esac
+          file "$binary" | grep -q "$expected"
+          if file "$binary" | grep -q 'dynamically linked'; then
+            echo "::error::Expected a statically linked binary"
+            exit 1
+          fi
+
+      - name: Assemble release archive
+        env:
+          TAG: ${{ needs.metadata.outputs.tag }}
+          ARCH: ${{ matrix.arch }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          staging="portbridge-${TAG}-linux-${ARCH}"
+          mkdir -p "dist/${staging}"
+          install -m 0755 "target/${TARGET}/release/portbridge" "dist/${staging}/portbridge"
+          install -m 0755 install.sh "dist/${staging}/install.sh"
+          cp -R app "dist/${staging}/app"
+          test -f "dist/${staging}/app/templates/login.html"
+          test -f "dist/${staging}/app/static/js/app.js"
+          tar --sort=name --owner=0 --group=0 --numeric-owner \
+            -C dist -czf "dist/${staging}.tar.gz" "${staging}"
+          tar -tzf "dist/${staging}.tar.gz" > dist/contents.txt
+          grep -Fxq "${staging}/install.sh" dist/contents.txt
+
+      - name: Upload archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: portbridge-${{ matrix.arch }}
+          path: dist/portbridge-*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Attach assets to release
+    needs: [metadata, build]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      # This job never checks out or runs repository code: it only handles the
+      # build artifacts and writes them to the existing release.
+      - name: Download archives
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Verify archives, checksum them and upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.metadata.outputs.tag }}
+        run: |
+          set -euo pipefail
+          cd dist
+          archives=(portbridge-*.tar.gz)
+          if [[ ${#archives[@]} -ne 2 ]]; then
+            echo "::error::Expected two release archives, found ${#archives[@]}"
+            exit 1
+          fi
+          for archive in "${archives[@]}"; do
+            tar -tzf "$archive" >/dev/null
+            if [[ $archive != "portbridge-${TAG}-linux-"* ]]; then
+              echo "::error::Unexpected archive name: $archive"
+              exit 1
+            fi
+          done
+          sha256sum "${archives[@]}" > SHA256SUMS
+          cat SHA256SUMS
+
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release upload "$TAG" "${archives[@]}" SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --clobber
+
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets[].name' | sort > uploaded-assets.txt
+          for asset in "${archives[@]}" SHA256SUMS; do
+            grep -qxF "$asset" uploaded-assets.txt
+          done

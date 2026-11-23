@@ -38,3 +38,4 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           event-type: release-completed
+          client-payload: '{"tag":"${{ steps.tag.outputs.new_tag }}"}'
