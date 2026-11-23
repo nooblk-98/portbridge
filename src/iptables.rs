@@ -49,7 +49,7 @@ impl IPTablesService {
         }
     }
 
-    pub fn detect_primary_interface(&self) -> String {
+    pub fn detect_primary_interface(&self) -> Result<String, AppError> {
         let command = vec![
             "sh".to_string(),
             "-c".to_string(),
@@ -58,10 +58,15 @@ impl IPTablesService {
         if let Ok(result) = self.runner.run(&command, false, None) {
             let iface = result.stdout.trim();
             if !iface.is_empty() {
-                return iface.to_string();
+                return Ok(iface.to_string());
             }
         }
-        "eth0".to_string()
+        if self.config.allow_internet_egress {
+            return Err(AppError::runtime(
+                "Unable to determine the primary interface for internet egress.",
+            ));
+        }
+        Ok("eth0".to_string())
     }
 
     fn install_chain(
@@ -174,7 +179,7 @@ impl IPTablesService {
         if self.config.allow_internet_egress {
             let mut destinations = egress_blocks();
             destinations.extend(
-                self.external_connected_routes(ext_iface)
+                self.external_connected_routes(ext_iface)?
                     .into_iter()
                     .map(|network| network.to_string()),
             );
@@ -215,7 +220,7 @@ impl IPTablesService {
         Ok(rules)
     }
 
-    fn external_connected_routes(&self, interface: &str) -> Vec<Ipv4Net> {
+    fn external_connected_routes(&self, interface: &str) -> Result<Vec<Ipv4Net>, AppError> {
         let command = vec![
             "ip".to_string(),
             "-j".to_string(),
@@ -225,23 +230,40 @@ impl IPTablesService {
             "dev".to_string(),
             interface.to_string(),
         ];
-        let Ok(result) = self.runner.run(&command, true, None) else {
-            return Vec::new();
+        let result = self
+            .runner
+            .run(&command, false, None)
+            .map_err(|_| AppError::runtime("Unable to read directly connected IPv4 routes."))?;
+        if result.returncode != 0 {
+            return Err(AppError::runtime(
+                "Unable to read directly connected IPv4 routes.",
+            ));
+        }
+        let parsed: Value = serde_json::from_str(&result.stdout)
+            .map_err(|_| AppError::runtime("Unable to read directly connected IPv4 routes."))?;
+        let Value::Array(entries) = parsed else {
+            return Err(AppError::runtime(
+                "Unable to read directly connected IPv4 routes.",
+            ));
         };
-        let Ok(Value::Array(entries)) = serde_json::from_str::<Value>(&result.stdout) else {
-            return Vec::new();
-        };
-        entries
-            .iter()
-            .filter_map(|entry| entry.get("dst").and_then(Value::as_str))
-            .filter(|destination| *destination != "default")
-            .filter_map(|value| parse_cidr(value).ok())
-            .collect()
+        let mut routes = Vec::new();
+        for entry in entries {
+            let destination = entry.get("dst").and_then(Value::as_str).ok_or_else(|| {
+                AppError::runtime("Unable to read directly connected IPv4 routes.")
+            })?;
+            if destination == "default" {
+                continue;
+            }
+            routes.push(parse_cidr(destination).map_err(|_| {
+                AppError::runtime("Unable to read directly connected IPv4 routes.")
+            })?);
+        }
+        Ok(routes)
     }
 
     pub fn apply_forwardings(&self, rules: &[Value]) -> Result<(), AppError> {
         let _guard = self.lock.lock().expect("iptables lock");
-        let ext_iface = self.detect_primary_interface();
+        let ext_iface = self.detect_primary_interface()?;
         let interface = self.config.wg_interface.clone();
         let network = self.config.wg_network.to_string();
         let raw = self

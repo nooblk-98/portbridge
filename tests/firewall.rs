@@ -237,3 +237,103 @@ fn invalid_rule_is_skipped() {
     )
     .is_empty());
 }
+
+fn egress_firewall(setup: &Setup) -> std::sync::Arc<portbridge::iptables::IPTablesService> {
+    setup.runner.set_stdout(
+        "sh -c ip route show default | awk '{print $5; exit}'",
+        "eth0\n",
+    );
+    let mut config = (*setup.config).clone();
+    config.allow_internet_egress = true;
+    let storage: std::sync::Arc<dyn portbridge::storage::Storage> = setup.storage.clone();
+    std::sync::Arc::new(portbridge::iptables::IPTablesService::new(
+        std::sync::Arc::new(config),
+        storage,
+        setup.runner.clone(),
+    ))
+}
+
+fn restore_count(setup: &Setup) -> usize {
+    setup
+        .runner
+        .calls()
+        .iter()
+        .filter(|(command, _)| command.first().map(String::as_str) == Some("iptables-restore"))
+        .count()
+}
+
+#[test]
+fn egress_route_discovery_failure_keeps_the_running_policy() {
+    let setup = Setup::new();
+    setup.seed_keys();
+    setup.store(&[client("owner", "10.8.0.2", "owner-public")]);
+    let firewall = egress_firewall(&setup);
+    firewall.apply_forwardings(&[]).expect("initial policy");
+    let installed = restore_count(&setup);
+
+    setup.runner.fail_next("ip -j -4 route show dev eth0", 1);
+    let error = firewall
+        .apply_forwardings(&[])
+        .expect_err("discovery failure");
+    assert!(error.to_string().contains("directly connected"), "{error}");
+    assert_eq!(
+        restore_count(&setup),
+        installed,
+        "policy must not be replaced"
+    );
+
+    setup
+        .runner
+        .set_stdout("ip -j -4 route show dev eth0", "{not json");
+    let error = firewall
+        .apply_forwardings(&[])
+        .expect_err("invalid discovery output");
+    assert!(error.to_string().contains("directly connected"), "{error}");
+    assert_eq!(
+        restore_count(&setup),
+        installed,
+        "policy must not be replaced"
+    );
+}
+
+#[test]
+fn egress_blocks_discovered_direct_routes_before_allowing_internet() {
+    let setup = Setup::new();
+    setup.seed_keys();
+    setup.store(&[client("owner", "10.8.0.2", "owner-public")]);
+    setup.runner.set_stdout(
+        "ip -j -4 route show dev eth0",
+        r#"[{"dst":"192.0.2.0/24","dev":"eth0"},{"dst":"default","dev":"eth0"}]"#,
+    );
+    let firewall = egress_firewall(&setup);
+    let rules = firewall.routing_rules("eth0").expect("rules");
+    let direct = vec![
+        "-i",
+        "wg0",
+        "-o",
+        "eth0",
+        "-d",
+        "192.0.2.0/24",
+        "-j",
+        "DROP",
+    ];
+    let allow = vec![
+        "-i",
+        "wg0",
+        "-o",
+        "eth0",
+        "-s",
+        "10.8.0.0/24",
+        "-j",
+        "ACCEPT",
+    ];
+    let direct_index = rules
+        .iter()
+        .position(|rule| *rule == direct)
+        .expect("direct block");
+    let allow_index = rules
+        .iter()
+        .position(|rule| *rule == allow)
+        .expect("internet allow");
+    assert!(direct_index < allow_index);
+}

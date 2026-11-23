@@ -1,6 +1,5 @@
 use std::env;
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use ipnet::Ipv4Net;
@@ -15,6 +14,7 @@ pub struct Config {
     pub clients_dir: PathBuf,
     pub clients_file: PathBuf,
     pub forward_file: PathBuf,
+    pub sessions_file: PathBuf,
     pub wg_config_path: PathBuf,
     pub wg_interface: String,
     pub wg_port: u16,
@@ -84,8 +84,26 @@ fn var(name: &str) -> Option<String> {
     env::var(name).ok().filter(|value| !value.is_empty())
 }
 
+/// Reject a missing, blank or default dashboard password before any state is
+/// created on disk.
+pub fn validate_admin_password(value: Option<&str>) -> Result<String, AppError> {
+    let value = value.unwrap_or("").trim();
+    if value.is_empty() {
+        return Err(AppError::config(
+            "Set ADMIN_PASSWORD to a non-default password before starting PortBridge.",
+        ));
+    }
+    if value.eq_ignore_ascii_case("admin") {
+        return Err(AppError::config(
+            "Set ADMIN_PASSWORD to a non-default password before starting PortBridge.",
+        ));
+    }
+    Ok(value.to_string())
+}
+
 impl Config {
     pub fn from_env() -> Result<Self, AppError> {
+        let admin_password = validate_admin_password(env::var("ADMIN_PASSWORD").ok().as_deref())?;
         let data_dir = PathBuf::from(env::var("DATA_DIR").unwrap_or_else(|_| "/data".to_string()));
         let clients_dir = data_dir.join("clients");
         let clients_file = data_dir.join("clients.json");
@@ -140,7 +158,6 @@ impl Config {
             None => default_forward_target.to_string(),
         };
 
-        let admin_password = env::var("ADMIN_PASSWORD").unwrap_or_else(|_| "admin".to_string());
         let default_client_name =
             env::var("DEFAULT_CLIENT_NAME").unwrap_or_else(|_| "default".to_string());
         let template_dir =
@@ -148,12 +165,14 @@ impl Config {
         let static_dir =
             PathBuf::from(env::var("STATIC_DIR").unwrap_or_else(|_| "app/static".to_string()));
         let secret_key = load_or_create_secret_key(&data_dir);
+        let sessions_file = data_dir.join("sessions.json");
 
         Ok(Config {
             data_dir,
             clients_dir,
             clients_file,
             forward_file,
+            sessions_file,
             wg_config_path,
             wg_interface,
             wg_port,
@@ -190,10 +209,12 @@ impl Config {
     pub fn for_test(data_dir: PathBuf) -> Self {
         let wg_network: Ipv4Net = "10.8.0.0/24".parse().expect("test network");
         let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let sessions_file = data_dir.join("sessions.json");
         Self {
             clients_dir: data_dir.join("clients"),
             clients_file: data_dir.join("clients.json"),
             forward_file: data_dir.join("forwardings.json"),
+            sessions_file,
             wg_config_path: data_dir.join("wg0.conf"),
             template_dir: repo.join("app/templates"),
             static_dir: repo.join("app/static"),
@@ -244,20 +265,14 @@ fn load_or_create_secret_key(data_dir: &Path) -> Vec<u8> {
     let read = || -> std::io::Result<Vec<u8>> { fs::read(&key_file) };
     if let Ok(key) = read() {
         if key.len() >= 24 {
+            crate::storage::normalize_private_file(&key_file);
+            let _ = crate::storage::secure_directory(data_dir);
             return key;
         }
     }
     let mut key = vec![0_u8; 32];
     OsRng.fill_bytes(&mut key);
-    if fs::create_dir_all(data_dir).is_ok() {
-        if let Ok(mut file) = fs::File::create(&key_file) {
-            let _ = file.write_all(&key);
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = fs::set_permissions(&key_file, fs::Permissions::from_mode(0o600));
-            }
-        }
-    }
+    let _ = crate::storage::secure_directory(data_dir);
+    let _ = crate::storage::write_atomic(&key_file, &key);
     key
 }

@@ -1,9 +1,9 @@
 {
   "schema": "rust-anything/app-cases@1",
-  "name": "run_python",
+  "name": "portbridge",
   "run": [
     "bash",
-    "parity/run_python.sh",
+    "parity/run_rust.sh",
     "{port}"
   ],
   "timeout_secs": 30,

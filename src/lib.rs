@@ -67,7 +67,10 @@ pub fn build_services_with(
         config.clone(),
         forwarding_manager.clone(),
     ));
-    let auth = Arc::new(Auth::new(config.secret_key().to_vec()));
+    let auth = Arc::new(Auth::new(
+        storage.clone(),
+        config.sessions_file.to_string_lossy().into_owned(),
+    ));
     Services {
         config,
         storage,

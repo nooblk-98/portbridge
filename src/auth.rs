@@ -1,34 +1,54 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use axum::http::HeaderMap;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use hmac::{Hmac, Mac};
-use sha1::Sha1;
-use sha2::{Digest, Sha256, Sha512};
+use rand::rngs::OsRng;
+use rand::RngCore;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Map, Value};
+use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
+
+use crate::error::AppError;
+use crate::storage::Storage;
 
 const SESSION_COOKIE: &str = "session";
 const REMEMBER_COOKIE: &str = "remember_token";
-const REMEMBER_MAX_AGE: u64 = 365 * 24 * 60 * 60;
+/// Absolute session lifetime; no sliding renewal.
+pub const SESSION_TTL: u64 = 12 * 60 * 60;
+/// Absolute remember-cookie lifetime, deliberately shorter than a year.
+pub const REMEMBER_TTL: u64 = 30 * 24 * 60 * 60;
+const REMEMBER_MAX_AGE: u64 = REMEMBER_TTL;
+/// Tolerated clock skew for a record created in the future.
+const FUTURE_SKEW: u64 = 60;
 const MAX_ATTEMPTS: usize = 5;
 const WINDOW: Duration = Duration::from_secs(60);
 
-type HmacSha1 = Hmac<Sha1>;
-type HmacSha512 = Hmac<Sha512>;
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct SessionRecord {
+    created_at: u64,
+    expires_at: u64,
+    password_tag: String,
+}
 
 pub struct Auth {
-    secret_key: Vec<u8>,
+    sessions: Mutex<HashMap<String, SessionRecord>>,
+    storage: Arc<dyn Storage>,
+    sessions_path: String,
     attempts: Mutex<HashMap<IpAddr, Vec<Instant>>>,
 }
 
 impl Auth {
-    pub fn new(secret_key: Vec<u8>) -> Self {
+    pub fn new(storage: Arc<dyn Storage>, sessions_path: String) -> Self {
+        let sessions = load_sessions(storage.as_ref(), &sessions_path);
         Self {
-            secret_key,
+            sessions: Mutex::new(sessions),
+            storage,
+            sessions_path,
             attempts: Mutex::new(HashMap::new()),
         }
     }
@@ -62,104 +82,112 @@ impl Auth {
         supplied.ct_eq(expected).into()
     }
 
-    fn derived_key(&self, salt: &[u8]) -> Vec<u8> {
-        let mut mac = HmacSha1::new_from_slice(&self.secret_key).expect("hmac key");
-        mac.update(salt);
-        mac.finalize().into_bytes().to_vec()
+    /// Create one session token and one remember token, both server-side and
+    /// bound to the current password.
+    pub fn login(&self, password: &str) -> Result<Vec<String>, AppError> {
+        self.login_at(password, now_epoch())
     }
 
-    fn sign_value(&self, key: &[u8], value: &str) -> String {
-        let mut mac = HmacSha1::new_from_slice(key).expect("hmac key");
-        mac.update(value.as_bytes());
-        URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes())
-    }
-
-    pub fn new_session_cookie(&self) -> String {
-        self.session_cookie_for(br#"{"_user_id":"1","_fresh":true}"#)
-    }
-
-    /// The refreshed cookie Flask sends after the first authenticated request.
-    pub fn refreshed_session_cookie(&self) -> String {
-        self.session_cookie_for(br#"{"_fresh":false,"_user_id":"1"}"#)
-    }
-
-    fn session_cookie_for(&self, payload: &[u8]) -> String {
-        let payload = URL_SAFE_NO_PAD.encode(payload);
-        let timestamp = URL_SAFE_NO_PAD.encode(minimal_bytes(now_epoch()));
-        let value = format!("{payload}.{timestamp}");
-        let signature = self.sign_value(&self.derived_key(b"cookie-session"), &value);
-        format!("{value}.{signature}")
-    }
-
-    /// Verify a Flask/itsdangerous session cookie, including cookies issued by
-    /// the Python reference before the upgrade.
-    pub fn session_user(&self, cookie: &str) -> Option<String> {
-        let mut parts = cookie.rsplitn(3, '.');
-        let signature = parts.next()?;
-        let timestamp = parts.next()?;
-        let payload = parts.next()?;
-        if payload.is_empty() || timestamp.is_empty() || signature.is_empty() {
-            return None;
+    fn login_at(&self, password: &str, now: u64) -> Result<Vec<String>, AppError> {
+        let mut sessions = self.sessions.lock().expect("session lock");
+        prune(&mut sessions, now);
+        while sessions.len() >= 512 {
+            if let Some(oldest) = sessions
+                .iter()
+                .min_by_key(|(_, record)| record.expires_at)
+                .map(|(token, _)| token.clone())
+            {
+                sessions.remove(&oldest);
+            } else {
+                break;
+            }
         }
-        let value = format!("{payload}.{timestamp}");
-        let expected = self.sign_value(&self.derived_key(b"cookie-session"), &value);
-        if !constant_time_equal(&expected, signature) {
-            return None;
+        let tag = password_tag(password);
+        let session_token = random_token();
+        let remember_token = random_token();
+        sessions.insert(
+            session_token.clone(),
+            SessionRecord {
+                created_at: now,
+                expires_at: now.saturating_add(SESSION_TTL),
+                password_tag: tag.clone(),
+            },
+        );
+        sessions.insert(
+            remember_token.clone(),
+            SessionRecord {
+                created_at: now,
+                expires_at: now.saturating_add(REMEMBER_TTL),
+                password_tag: tag,
+            },
+        );
+        if let Err(error) = persist(self.storage.as_ref(), &self.sessions_path, &sessions) {
+            sessions.remove(&session_token);
+            sessions.remove(&remember_token);
+            return Err(error);
         }
-        let decoded = URL_SAFE_NO_PAD.decode(payload).ok()?;
-        let session: serde_json::Value = serde_json::from_slice(&decoded).ok()?;
-        session
-            .get("_user_id")
-            .and_then(serde_json::Value::as_str)
-            .filter(|value| !value.is_empty())
-            .map(str::to_string)
+        Ok(vec![
+            format!(
+                "{SESSION_COOKIE}={session_token}; HttpOnly; Path=/; SameSite=Lax"
+            ),
+            format!(
+                "{REMEMBER_COOKIE}={remember_token}; Max-Age={REMEMBER_MAX_AGE}; HttpOnly; Path=/; SameSite=Lax"
+            ),
+        ])
     }
 
-    pub fn new_remember_cookie(&self) -> String {
-        let payload = "1";
-        let digest = remember_digest(&self.secret_key, payload);
-        format!("{payload}|{digest}")
+    pub fn authenticate(&self, headers: &HeaderMap, password: &str) -> bool {
+        self.authenticate_at(headers, password, now_epoch())
     }
 
-    pub fn remember_user(&self, cookie: &str) -> Option<String> {
-        let (payload, digest) = cookie.rsplit_once('|')?;
-        if payload.is_empty() {
-            return None;
-        }
-        let expected = remember_digest(&self.secret_key, payload);
-        if constant_time_equal(&expected, digest) {
-            Some(payload.to_string())
-        } else {
-            None
-        }
+    fn authenticate_at(&self, headers: &HeaderMap, password: &str, now: u64) -> bool {
+        self.valid_token(headers, password, now).is_some()
     }
 
-    pub fn is_authenticated(&self, headers: &HeaderMap) -> bool {
+    /// The still-valid token presented by this request, if any.
+    pub fn session_token(&self, headers: &HeaderMap, password: &str) -> Option<String> {
+        self.valid_token(headers, password, now_epoch())
+    }
+
+    fn valid_token(&self, headers: &HeaderMap, password: &str, now: u64) -> Option<String> {
         let cookies = cookie_values(headers);
-        if let Some(cookie) = cookies.get(SESSION_COOKIE) {
-            if self.session_user(cookie).is_some() {
-                return true;
+        let tag = password_tag(password);
+        let sessions = self.sessions.lock().expect("session lock");
+        for name in [SESSION_COOKIE, REMEMBER_COOKIE] {
+            let Some(token) = cookies.get(name) else {
+                continue;
+            };
+            let Some(record) = sessions.get(token) else {
+                continue;
+            };
+            if record.created_at > now.saturating_add(FUTURE_SKEW) {
+                continue;
             }
-        }
-        if let Some(cookie) = cookies.get(REMEMBER_COOKIE) {
-            if self.remember_user(cookie).is_some() {
-                return true;
+            if record.expires_at <= now {
+                continue;
             }
+            if record.password_tag != tag {
+                continue;
+            }
+            return Some(token.clone());
         }
-        false
+        None
     }
 
-    pub fn login_cookies(&self) -> Vec<String> {
-        vec![
-            format!(
-                "{SESSION_COOKIE}={}; HttpOnly; Path=/; SameSite=Lax",
-                self.new_session_cookie()
-            ),
-            format!(
-                "{REMEMBER_COOKIE}={}; Max-Age={REMEMBER_MAX_AGE}; HttpOnly; Path=/; SameSite=Lax",
-                self.new_remember_cookie()
-            ),
-        ]
+    /// Remove both presented tokens so a copied cookie stops working.
+    pub fn logout(&self, headers: &HeaderMap) -> Result<(), AppError> {
+        let cookies = cookie_values(headers);
+        let mut sessions = self.sessions.lock().expect("session lock");
+        let mut changed = false;
+        for name in [SESSION_COOKIE, REMEMBER_COOKIE] {
+            if let Some(token) = cookies.get(name) {
+                changed |= sessions.remove(token).is_some();
+            }
+        }
+        if changed {
+            persist(self.storage.as_ref(), &self.sessions_path, &sessions)?;
+        }
+        Ok(())
     }
 
     pub fn logout_cookies(&self) -> Vec<String> {
@@ -187,19 +215,51 @@ pub fn cookie_values(headers: &HeaderMap) -> HashMap<String, String> {
     values
 }
 
-fn remember_digest(secret_key: &[u8], payload: &str) -> String {
-    let mut mac = HmacSha512::new_from_slice(secret_key).expect("hmac key");
-    mac.update(payload.as_bytes());
-    to_hex(&mac.finalize().into_bytes())
+fn load_sessions(storage: &dyn Storage, path: &str) -> HashMap<String, SessionRecord> {
+    let payload = storage.load_json(path, json!({}));
+    let Value::Object(entries) = payload else {
+        return HashMap::new();
+    };
+    entries
+        .into_iter()
+        .filter_map(|(token, value)| {
+            let record: SessionRecord = serde_json::from_value(value).ok()?;
+            Some((token, record))
+        })
+        .collect()
 }
 
-fn constant_time_equal(left: &str, right: &str) -> bool {
-    let left = left.as_bytes();
-    let right = right.as_bytes();
-    if left.len() != right.len() {
-        return false;
-    }
-    left.ct_eq(right).into()
+fn persist(
+    storage: &dyn Storage,
+    path: &str,
+    sessions: &HashMap<String, SessionRecord>,
+) -> Result<(), AppError> {
+    let payload = sessions
+        .iter()
+        .fold(Map::new(), |mut map, (token, record)| {
+            map.insert(
+                token.clone(),
+                serde_json::to_value(record).unwrap_or(Value::Null),
+            );
+            map
+        });
+    storage.save_json(path, &Value::Object(payload))
+}
+
+fn prune(sessions: &mut HashMap<String, SessionRecord>, now: u64) {
+    sessions.retain(|_, record| {
+        record.expires_at > now && record.created_at <= now.saturating_add(FUTURE_SKEW)
+    });
+}
+
+pub fn password_tag(password: &str) -> String {
+    sha256_hex(&format!("portbridge-session:{password}"))
+}
+
+fn random_token() -> String {
+    let mut bytes = [0_u8; 32];
+    OsRng.fill_bytes(&mut bytes);
+    URL_SAFE_NO_PAD.encode(bytes)
 }
 
 fn now_epoch() -> u64 {
@@ -207,18 +267,6 @@ fn now_epoch() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs())
         .unwrap_or(0)
-}
-
-fn minimal_bytes(value: u64) -> Vec<u8> {
-    if value == 0 {
-        return vec![0];
-    }
-    let bytes = value.to_be_bytes();
-    let first = bytes
-        .iter()
-        .position(|byte| *byte != 0)
-        .unwrap_or(bytes.len() - 1);
-    bytes[first..].to_vec()
 }
 
 pub fn sha256_hex(content: &str) -> String {
@@ -239,33 +287,103 @@ pub fn to_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::InMemoryStorage;
+    use axum::http::HeaderValue;
 
-    #[test]
-    fn flask_session_cookie_round_trips() {
-        let auth = Auth::new(b"0123456789abcdef0123456789abcdef".to_vec());
-        let cookie = auth.new_session_cookie();
-        assert_eq!(auth.session_user(&cookie).as_deref(), Some("1"));
-        assert!(auth.session_user(&cookie.replace('a', "b")).is_none());
+    fn auth() -> (Auth, Arc<dyn Storage>) {
+        let storage: Arc<dyn Storage> = Arc::new(InMemoryStorage::new());
+        (
+            Auth::new(storage.clone(), "/data/sessions.json".to_string()),
+            storage,
+        )
+    }
+
+    fn token(cookie: &str) -> String {
+        cookie
+            .split(';')
+            .next()
+            .unwrap_or("")
+            .split_once('=')
+            .map(|(_, value)| value.to_string())
+            .unwrap_or_default()
+    }
+
+    fn headers(cookie: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            axum::http::header::COOKIE,
+            HeaderValue::from_str(cookie).expect("cookie"),
+        );
+        headers
     }
 
     #[test]
-    fn flask_login_remember_cookie_is_accepted() {
-        let auth = Auth::new(b"0123456789abcdef0123456789abcdef".to_vec());
-        let flask = "1|5ce330b5e14f619d94b69cb6c3df4db95ebf66cb72f379401f220e720ee02d3d84f4f613d28de5f1059b89f06f12d0c0ebfc3a5e9b1f522e188e3c1004093d35";
-        assert_eq!(auth.remember_user(flask).as_deref(), Some("1"));
+    fn session_and_remember_tokens_expire_absolutely() {
+        let (auth, _) = auth();
+        let cookies = auth.login_at("test-password", 1_000).expect("login");
+        let session = format!("session={}", token(&cookies[0]));
+        let remember = format!("remember_token={}", token(&cookies[1]));
+        assert!(auth.authenticate_at(&headers(&session), "test-password", 1_001));
+        assert!(auth.authenticate_at(
+            &headers(&remember),
+            "test-password",
+            1_000 + REMEMBER_TTL - 1
+        ));
+        assert!(!auth.authenticate_at(&headers(&remember), "test-password", 1_000 + REMEMBER_TTL));
+        assert!(!auth.authenticate_at(&headers(&session), "test-password", 1_000 + SESSION_TTL));
     }
 
     #[test]
-    fn remember_cookie_round_trips() {
-        let auth = Auth::new(b"0123456789abcdef0123456789abcdef".to_vec());
-        let cookie = auth.new_remember_cookie();
-        assert_eq!(auth.remember_user(&cookie).as_deref(), Some("1"));
-        assert!(auth.remember_user("1|deadbeef").is_none());
+    fn future_and_expired_records_are_rejected() {
+        let (auth, _) = auth();
+        let cookies = auth.login_at("test-password", 2_000).expect("login");
+        let session = format!("session={}", token(&cookies[0]));
+        assert!(!auth.authenticate_at(&headers(&session), "test-password", 1_900));
+        assert!(!auth.authenticate_at(&headers(&session), "test-password", 2_000 + SESSION_TTL));
+    }
+
+    #[test]
+    fn sessions_are_bound_to_the_current_password() {
+        let (auth, _) = auth();
+        let cookies = auth.login_at("old-password", 3_000).expect("login");
+        let session = format!("session={}", token(&cookies[0]));
+        assert!(auth.authenticate_at(&headers(&session), "old-password", 3_001));
+        assert!(!auth.authenticate_at(&headers(&session), "new-password", 3_001));
+    }
+
+    #[test]
+    fn logout_invalidates_the_presented_tokens() {
+        let (auth, _) = auth();
+        let cookies = auth.login_at("test-password", 4_000).expect("login");
+        let session = format!("session={}", token(&cookies[0]));
+        let remember = format!("remember_token={}", token(&cookies[1]));
+        auth.logout(&headers(&session)).expect("logout");
+        assert!(!auth.authenticate_at(&headers(&session), "test-password", 4_001));
+        assert!(auth.authenticate_at(&headers(&remember), "test-password", 4_001));
+        auth.logout(&headers(&remember)).expect("logout");
+        assert!(!auth.authenticate_at(&headers(&remember), "test-password", 4_002));
+    }
+
+    #[test]
+    fn legacy_flask_cookies_are_rejected() {
+        let (auth, _) = auth();
+        let legacy =
+            "session=eyJfdXNlcl9pZCI6IjEiLCJfZnJlc2giOnRydWV9.awRTyA.nbJPbzvLnVmqIuFqYFeppOhLz5Q";
+        assert!(!auth.authenticate_at(&headers(legacy), "test-password", 5_000));
+    }
+
+    #[test]
+    fn tokens_are_persisted_across_instances() {
+        let (auth, storage) = auth();
+        let cookies = auth.login_at("test-password", 6_000).expect("login");
+        let session = format!("session={}", token(&cookies[0]));
+        let restarted = Auth::new(storage, "/data/sessions.json".to_string());
+        assert!(restarted.authenticate_at(&headers(&session), "test-password", 6_001));
     }
 
     #[test]
     fn rate_limit_allows_five_then_blocks() {
-        let auth = Auth::new(b"secret".to_vec());
+        let (auth, _) = auth();
         let address: IpAddr = "192.0.2.10".parse().unwrap();
         for _ in 0..5 {
             assert!(!auth.is_rate_limited(address));

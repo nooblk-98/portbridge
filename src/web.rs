@@ -89,7 +89,16 @@ pub fn router(state: AppState) -> Router {
 
 async fn security_headers(State(state): State<AppState>, request: Request, next: Next) -> Response {
     let path = request.uri().path().to_string();
-    let authenticated = state.auth.is_authenticated(request.headers());
+    let authenticated = state
+        .auth
+        .authenticate(request.headers(), &state.config.admin_password);
+    let token = if authenticated {
+        state
+            .auth
+            .session_token(request.headers(), &state.config.admin_password)
+    } else {
+        None
+    };
     let mut response = next.run(request).await;
     response.headers_mut().insert(
         header::CONTENT_SECURITY_POLICY,
@@ -100,11 +109,9 @@ async fn security_headers(State(state): State<AppState>, request: Request, next:
             .headers_mut()
             .insert(header::VARY, HeaderValue::from_static("Cookie"));
         // Flask refreshes the session cookie on every authenticated response.
-        if authenticated && !response.headers().contains_key(header::SET_COOKIE) {
-            let cookie = format!(
-                "session={}; HttpOnly; Path=/; SameSite=Lax",
-                state.auth.refreshed_session_cookie()
-            );
+        if let Some(token) = token.filter(|_| !response.headers().contains_key(header::SET_COOKIE))
+        {
+            let cookie = format!("session={token}; HttpOnly; Path=/; SameSite=Lax");
             if let Ok(value) = HeaderValue::from_str(&cookie) {
                 response.headers_mut().append(header::SET_COOKIE, value);
             }
@@ -149,7 +156,10 @@ fn render(state: &AppState, template: &str) -> Result<Response, AppError> {
 }
 
 fn require_auth(state: &AppState, headers: &HeaderMap) -> Option<Response> {
-    if state.auth.is_authenticated(headers) {
+    if state
+        .auth
+        .authenticate(headers, &state.config.admin_password)
+    {
         None
     } else {
         Some(
@@ -174,7 +184,10 @@ fn redirect_found(location: &str) -> Response {
 }
 
 async fn index(State(state): State<AppState>, headers: HeaderMap) -> Response {
-    if !state.auth.is_authenticated(&headers) {
+    if !state
+        .auth
+        .authenticate(&headers, &state.config.admin_password)
+    {
         return redirect_found("/login?next=/");
     }
     match render(&state, "index.html") {
@@ -184,7 +197,10 @@ async fn index(State(state): State<AppState>, headers: HeaderMap) -> Response {
 }
 
 async fn login_page(State(state): State<AppState>, headers: HeaderMap) -> Response {
-    if state.auth.is_authenticated(&headers) {
+    if state
+        .auth
+        .authenticate(&headers, &state.config.admin_password)
+    {
         return redirect_found("/");
     }
     match render(&state, "login.html") {
@@ -217,16 +233,25 @@ async fn auth_login(
     let password = payload
         .get("password")
         .and_then(Value::as_str)
-        .unwrap_or("");
+        .filter(|value| !value.trim().is_empty());
+    let Some(password) = password else {
+        return json_response(
+            StatusCode::UNAUTHORIZED,
+            json!({"error": "Invalid password"}),
+        );
+    };
     if state
         .auth
         .password_matches(password, &state.config.admin_password)
     {
         state.auth.clear_rate_limit(peer.ip());
-        return with_cookies(
-            json_response(StatusCode::OK, json!({"status": "ok"})),
-            state.auth.login_cookies(),
-        );
+        return match state.auth.login(password) {
+            Ok(cookies) => with_cookies(
+                json_response(StatusCode::OK, json!({"status": "ok"})),
+                cookies,
+            ),
+            Err(error) => error.into_response(),
+        };
     }
     json_response(
         StatusCode::UNAUTHORIZED,
@@ -237,6 +262,9 @@ async fn auth_login(
 async fn auth_logout(State(state): State<AppState>, headers: HeaderMap) -> Response {
     if let Some(response) = require_auth(&state, &headers) {
         return response;
+    }
+    if let Err(error) = state.auth.logout(&headers) {
+        return error.into_response();
     }
     with_cookies(
         json_response(StatusCode::OK, json!({"status": "ok"})),
@@ -397,6 +425,9 @@ async fn download_config(state: &AppState, headers: &HeaderMap, name: &str) -> R
             .insert(header::CONTENT_DISPOSITION, value);
     }
     response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
 }
 
 async fn qr_code(state: &AppState, headers: &HeaderMap, name: &str) -> Response {
@@ -427,6 +458,9 @@ async fn qr_code(state: &AppState, headers: &HeaderMap, name: &str) -> Response 
             .headers_mut()
             .insert(header::CONTENT_DISPOSITION, value);
     }
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     response
 }
 

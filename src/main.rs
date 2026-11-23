@@ -22,23 +22,12 @@ async fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    if config.admin_password == "admin" {
-        tracing::warn!(
-            "SECURITY: ADMIN_PASSWORD is set to the default 'admin'. \
-Set the ADMIN_PASSWORD environment variable to a strong password."
-        );
-    }
     if config.wg_host == "127.0.0.1" {
         tracing::warn!(
             "CONFIG: WG_HOST is '127.0.0.1' (default). \
 Clients will receive an unusable config. Set WG_HOST to your server's public IP or hostname."
         );
     }
-    if config.admin_password == "admin" {
-        eprintln!("Set ADMIN_PASSWORD to a non-default password before starting PortBridge.");
-        return ExitCode::FAILURE;
-    }
-
     let services = portbridge::build_services(config);
     if let Err(error) = services.client_manager.bootstrap() {
         eprintln!("Bootstrap failed: {error}");

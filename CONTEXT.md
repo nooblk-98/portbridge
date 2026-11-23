@@ -38,6 +38,6 @@ PortBridge exposes services running on devices behind NAT/CGNAT/Starlink through
 
 **ForwardingManager** — orchestrates port forwarding rule lifecycle (add, remove) by coordinating `IPTablesService`, `Storage` and `RuleRenderer`.
 
-**Auth** — Flask-compatible signed session and remember cookies, constant-time password comparison and the per-IP login rate limit.
+**Auth** — bounded-expiry server-side sessions with random opaque tokens, password-bound session and remember cookies, constant-time password comparison and the per-IP login rate limit. Legacy Flask cookies require one login after upgrade.
 
 **Web** — the axum router, JSON API, Jinja-compatible templates and static assets. Templates and assets are shared with the frontend workstream under `app/templates` and `app/static`.

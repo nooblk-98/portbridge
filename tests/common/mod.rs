@@ -62,7 +62,10 @@ impl Setup {
             config.clone(),
             forwarding.clone(),
         ));
-        let auth = Arc::new(Auth::new(config.secret_key().to_vec()));
+        let auth = Arc::new(Auth::new(
+            storage.clone(),
+            config.sessions_file.to_string_lossy().into_owned(),
+        ));
         Self {
             _temp: temp,
             config,
@@ -130,7 +133,14 @@ impl Setup {
     }
 
     pub fn cookie(&self) -> String {
-        self.auth.new_session_cookie()
+        let cookies = self.auth.login("test-password").expect("login");
+        cookies[0]
+            .split(';')
+            .next()
+            .unwrap_or("")
+            .split_once('=')
+            .map(|(_, value)| value.to_string())
+            .unwrap_or_default()
     }
 
     pub fn store_forwarding(&self, rule: Value) {

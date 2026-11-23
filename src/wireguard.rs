@@ -45,10 +45,28 @@ impl WireGuardService {
     }
 
     pub fn ensure_dirs(&self) {
-        let _ = std::fs::create_dir_all(&self.config.data_dir);
-        let _ = std::fs::create_dir_all(&self.config.clients_dir);
+        let _ = crate::storage::secure_directory(&self.config.data_dir);
+        let _ = crate::storage::secure_directory(&self.config.clients_dir);
         if let Some(parent) = self.config.wg_config_path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+            let _ = crate::storage::secure_directory_if_safe(parent);
+        }
+        for path in [
+            self.config.data_dir.join("server.privatekey"),
+            self.config.data_dir.join("server.publickey"),
+            self.config.data_dir.join(".secret_key"),
+            self.config.sessions_file.clone(),
+            self.config.clients_file.clone(),
+            self.config.forward_file.clone(),
+            self.config.wg_config_path.clone(),
+        ] {
+            crate::storage::normalize_private_file(&path);
+        }
+        if let Ok(entries) = std::fs::read_dir(&self.config.clients_dir) {
+            for entry in entries.flatten() {
+                if entry.path().extension().and_then(|value| value.to_str()) == Some("conf") {
+                    crate::storage::normalize_private_file(&entry.path());
+                }
+            }
         }
     }
 
@@ -81,6 +99,8 @@ impl WireGuardService {
             set_private_permissions(&private_path);
             set_private_permissions(&public_path);
         }
+        crate::storage::normalize_private_file(&private_path);
+        crate::storage::normalize_private_file(&public_path);
         let private = self
             .storage
             .read_text(&private_path_text)
