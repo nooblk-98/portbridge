@@ -4,7 +4,46 @@ PortBridge connects devices behind NAT or CGNAT to a WireGuard server you contro
 
 ## Install on Debian or Ubuntu without Docker
 
-Use a dedicated server with systemd, sudo access, and a public IP address or DNS name. For a source install, install `build-essential` with apt, then install Rust 1.85 or newer and Cargo through rustup as your regular user. A trusted prebuilt binary for your architecture can be used in place of the build step. Allow inbound UDP 51820 in your server and provider firewalls.
+Use a dedicated server with systemd, sudo access, and a public IP address or DNS name. Allow inbound UDP 51820 in your server and provider firewalls.
+
+### Install a prebuilt release (recommended)
+
+Releases include static binaries for 64-bit x86 (`x86_64`) and 64-bit ARM (`arm64`), the installer, and the dashboard files. You do not need git, Rust, or a compiler. This command pins `v1.0.0`, downloads the archive and its SHA-256 checksum, verifies the archive, extracts it into a private temporary directory, and runs the interactive installer. Replace `vpn.example.com` with your server's public hostname or IP. Find the Linux archives on the [Releases page](https://github.com/nooblk-98/portbridge/releases).
+
+```bash
+(
+set -euo pipefail
+# Use a release tag that includes the Linux binary assets.
+release=v1.0.0
+case "$(uname -m)" in
+  x86_64|amd64) arch=x86_64 ;;
+  aarch64|arm64) arch=arm64 ;;
+  *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+umask 077
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+cd "$work"
+archive="portbridge-${release}-linux-${arch}.tar.gz"
+url="https://github.com/nooblk-98/portbridge/releases/download/${release}"
+curl -fsSLO "${url}/${archive}"
+curl -fsSLO "${url}/SHA256SUMS"
+expected=$(awk -v file="$archive" '$2 == file {print $1}' SHA256SUMS)
+if [[ -z $expected ]]; then
+  echo "No checksum published for $archive" >&2
+  exit 1
+fi
+printf '%s  %s\n' "$expected" "$archive" | sha256sum -c -
+tar -xzf "$archive"
+sudo bash "${archive%.tar.gz}/install.sh" vpn.example.com
+)
+```
+
+Install `curl` first with `sudo apt-get install -y curl` if it is missing. The checksum check stops the command if the download is incomplete or does not match the published file. The temporary directory is removed when the command exits.
+
+### Build from source
+
+For development, install `build-essential` with apt, then install Rust 1.85 or newer and Cargo through rustup as your regular user.
 
 ```sh
 git clone https://github.com/nooblk-98/portbridge.git

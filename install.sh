@@ -65,15 +65,23 @@ if [[ -e /etc/wireguard/pb0.conf ]] || ip link show dev pb0 >/dev/null 2>&1; the
     die "The pb0 WireGuard interface is already in use."
 fi
 
-read -rsp "Dashboard password (at least 16 letters or numbers): " password
+# A release archive keeps the binary next to install.sh; a source checkout
+# passes PORTBRIDGE_BINARY explicitly.
+portbridge_bin=${PORTBRIDGE_BINARY:-$source_dir/portbridge}
+if [[ ! -f $portbridge_bin || ! -x $portbridge_bin ]]; then
+    die "PortBridge binary not found at $portbridge_bin. Use a complete release archive or set PORTBRIDGE_BINARY to a trusted build."
+fi
+if [[ ! -f $source_dir/app/templates/login.html || ! -f $source_dir/app/static/js/app.js ]]; then
+    die "The installer is missing the dashboard files (app/templates and app/static). Use a complete release archive or repository checkout."
+fi
+
+if ! read -rsp "Dashboard password (at least 16 letters or numbers): " password; then
+    echo
+    die "The dashboard password prompt needs an interactive terminal."
+fi
 echo
 if [[ ! $password =~ ^[A-Za-z0-9]{16,128}$ ]]; then
     die "Choose a password of 16 to 128 letters or numbers."
-fi
-
-portbridge_bin=${PORTBRIDGE_BINARY:-}
-if [[ -z $portbridge_bin || ! -f $portbridge_bin || ! -x $portbridge_bin ]]; then
-    die "Set PORTBRIDGE_BINARY to an executable from a trusted PortBridge build. See the README for build steps."
 fi
 
 apt-get update
