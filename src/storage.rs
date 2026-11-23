@@ -77,32 +77,74 @@ impl Storage for JsonFileStorage {
     }
 }
 
-/// Create a directory and restrict it to the service account.
-pub fn secure_directory(path: &Path) -> std::io::Result<()> {
+/// Create a directory if it is missing and give only the service account
+/// access. Existing directories, especially a shared DATA_DIR, are left alone.
+pub fn create_private_directory(path: &Path) -> Result<(), AppError> {
+    if path.exists() {
+        if path.is_dir() {
+            return Ok(());
+        }
+        return Err(AppError::runtime(format!(
+            "State path is not a directory: {}",
+            path.display()
+        )));
+    }
     fs::create_dir_all(path)?;
+    set_directory_private(path)
+}
+
+/// Create or normalize a dedicated, application-owned directory to 0700.
+pub fn secure_app_directory(path: &Path) -> Result<(), AppError> {
+    create_private_directory(path)?;
+    set_directory_private(path)
+}
+
+pub fn set_directory_private(path: &Path) -> Result<(), AppError> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
+        let metadata = fs::symlink_metadata(path)?;
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            return Err(AppError::runtime(format!(
+                "Refusing to change permissions on {}",
+                path.display()
+            )));
+        }
         fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
     }
     Ok(())
 }
 
-/// Bring an existing private file created by an older release to 0600.
-pub fn normalize_private_file(path: &Path) {
+/// Restrict one file to the service account, propagating failures.
+pub fn set_private_file(path: &Path) -> Result<(), AppError> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        if let Ok(metadata) = fs::metadata(path) {
-            if !metadata.is_file() {
-                return;
-            }
-            let mut permissions = metadata.permissions();
-            if permissions.mode() & 0o777 != 0o600 {
-                permissions.set_mode(0o600);
-                let _ = fs::set_permissions(path, permissions);
-            }
+        let metadata = match fs::symlink_metadata(path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error.into()),
+        };
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(AppError::runtime(format!(
+                "Refusing to change permissions on {}",
+                path.display()
+            )));
         }
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
+    }
+    Ok(())
+}
+
+/// Bring an existing private file created by an older release to 0600.
+pub fn normalize_private_file(path: &Path) -> Result<(), AppError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.is_file() && !metadata.file_type().is_symlink() => {
+            set_private_file(path)
+        }
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
     }
 }
 
@@ -110,8 +152,7 @@ pub fn write_atomic(target: &Path, bytes: &[u8]) -> Result<(), AppError> {
     let parent = target
         .parent()
         .ok_or_else(|| AppError::runtime("State file has no parent directory."))?;
-    fs::create_dir_all(parent)?;
-    secure_directory_if_safe(parent)?;
+    create_private_directory(parent)?;
     let file_name = target
         .file_name()
         .and_then(|name| name.to_str())
@@ -132,9 +173,9 @@ pub fn write_atomic(target: &Path, bytes: &[u8]) -> Result<(), AppError> {
         let mut file = options.open(&temp)?;
         file.write_all(bytes)?;
         file.sync_all()?;
-        normalize_private_file(&temp);
+        set_private_file(&temp)?;
         fs::rename(&temp, target)?;
-        normalize_private_file(target);
+        set_private_file(target)?;
         if let Ok(directory) = fs::File::open(parent) {
             let _ = directory.sync_all();
         }
@@ -144,18 +185,6 @@ pub fn write_atomic(target: &Path, bytes: &[u8]) -> Result<(), AppError> {
         let _ = fs::remove_file(&temp);
     }
     result
-}
-
-/// Never chmod broad system directories such as `/etc`; only their private
-/// child directories (for example `/etc/wireguard`).
-pub fn secure_directory_if_safe(path: &Path) -> std::io::Result<()> {
-    const BROAD: [&str; 10] = [
-        "/", "/bin", "/boot", "/etc", "/home", "/opt", "/sbin", "/tmp", "/usr", "/var",
-    ];
-    if BROAD.contains(&path.to_string_lossy().as_ref()) {
-        return Ok(());
-    }
-    secure_directory(path)
 }
 
 pub struct InMemoryStorage {
@@ -199,8 +228,10 @@ impl Storage for InMemoryStorage {
             .lock()
             .expect("storage lock")
             .get(path)
-            .and_then(Value::as_str)
-            .map(str::to_string)
+            .map(|value| match value {
+                Value::String(text) => text.clone(),
+                other => serde_json::to_string(other).unwrap_or_else(|_| "null".to_string()),
+            })
     }
 
     fn write_text(&self, path: &str, content: &str) -> Result<(), crate::error::AppError> {

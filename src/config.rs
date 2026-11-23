@@ -164,7 +164,7 @@ impl Config {
             PathBuf::from(env::var("TEMPLATE_DIR").unwrap_or_else(|_| "app/templates".to_string()));
         let static_dir =
             PathBuf::from(env::var("STATIC_DIR").unwrap_or_else(|_| "app/static".to_string()));
-        let secret_key = load_or_create_secret_key(&data_dir);
+        let secret_key = load_or_create_secret_key(&data_dir)?;
         let sessions_file = data_dir.join("sessions.json");
 
         Ok(Config {
@@ -260,19 +260,19 @@ fn parse_env<T: std::str::FromStr>(name: &str, default: T) -> Result<T, AppError
     }
 }
 
-fn load_or_create_secret_key(data_dir: &Path) -> Vec<u8> {
+fn load_or_create_secret_key(data_dir: &Path) -> Result<Vec<u8>, AppError> {
     let key_file = data_dir.join(".secret_key");
     let read = || -> std::io::Result<Vec<u8>> { fs::read(&key_file) };
     if let Ok(key) = read() {
         if key.len() >= 24 {
-            crate::storage::normalize_private_file(&key_file);
-            let _ = crate::storage::secure_directory(data_dir);
-            return key;
+            crate::storage::normalize_private_file(&key_file)?;
+            crate::storage::create_private_directory(data_dir)?;
+            return Ok(key);
         }
     }
     let mut key = vec![0_u8; 32];
     OsRng.fill_bytes(&mut key);
-    let _ = crate::storage::secure_directory(data_dir);
-    let _ = crate::storage::write_atomic(&key_file, &key);
-    key
+    crate::storage::create_private_directory(data_dir)?;
+    crate::storage::write_atomic(&key_file, &key)?;
+    Ok(key)
 }

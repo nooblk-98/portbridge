@@ -7,8 +7,8 @@ use serde_json::{json, Value};
 
 use crate::config::Config;
 use crate::error::AppError;
-use crate::model::{allowed_recipient_addresses, parse_cidr, validated_peers, Client};
-use crate::rule_renderer::render_rule;
+use crate::model::{allowed_recipient_addresses, parse_cidr, validated_peers};
+use crate::rule_renderer::{render_rule, rule_is_valid};
 use crate::runner::Runner;
 use crate::storage::Storage;
 
@@ -143,18 +143,10 @@ impl IPTablesService {
             &same_tunnel,
             &["-s", &network, "-d", &network, "-j", "ACCEPT"],
         )];
-        let raw = self
-            .storage
-            .load_json(&self.config.clients_file.to_string_lossy(), json!([]));
-        let clients: Vec<Client> = raw
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .filter_map(|item| serde_json::from_value::<Client>(item.clone()).ok())
-                    .collect()
-            })
-            .unwrap_or_default();
+        let clients = crate::model::load_clients(
+            self.storage.as_ref(),
+            &self.config.clients_file.to_string_lossy(),
+        )?;
         let clients = validated_peers(&clients);
         for peer in &clients {
             for route in peer.options().advertised_routes {
@@ -287,25 +279,20 @@ impl IPTablesService {
         let routing = self.discovered_or_block(self.routing_rules(&ext_iface))?;
         let interface = self.config.wg_interface.clone();
         let network = self.config.wg_network.to_string();
-        let raw = self
-            .storage
-            .load_json(&self.config.clients_file.to_string_lossy(), json!([]));
-        let owners: BTreeMap<String, String> = raw
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .filter_map(|client| {
-                        let address = client.get("address")?.as_str()?.to_string();
-                        let key = client.get("public_key")?.as_str()?.to_string();
-                        Some((address, key))
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
+        let clients = crate::model::load_clients(
+            self.storage.as_ref(),
+            &self.config.clients_file.to_string_lossy(),
+        )?;
+        let owners: BTreeMap<String, String> = clients
+            .into_iter()
+            .map(|client| (client.address, client.public_key))
+            .collect();
         let active: Vec<&Value> = rules
             .iter()
             .filter(|rule| {
+                if !rule_is_valid(rule) {
+                    return false;
+                }
                 let peer_key = rule
                     .get("peer_public_key")
                     .and_then(Value::as_str)

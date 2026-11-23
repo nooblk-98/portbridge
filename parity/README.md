@@ -17,8 +17,8 @@ The Rust backend was checked against the Python reference with
 - `parity/seed-data/` — synthetic clients, forwardings, server keys, a fixed
   `.secret_key` and a `sessions.json` containing one opaque test session token.
   Every key, token and the secret are obvious TEST values, not credentials.
-  The recorded cases carry that opaque token; the matching password tag is for
-  `parity-password-123`. Sessions are now server-side and opaque, so the old
+  The recorded cases carry that opaque token; its password tag is an HMAC-SHA256
+  of `parity-password-123` under the fixture secret key. Sessions are now server-side and opaque, so the old
   Flask cookies are deliberately rejected and require one login after upgrade.
 - `parity/run_rust.sh` — copies the seed into a fresh run directory under `$FAKE_STATE`, sets the
   environment and starts `target/release/portbridge` on the requested port.

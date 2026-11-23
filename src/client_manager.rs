@@ -45,8 +45,8 @@ impl ClientManager {
 
     fn list_clients_locked(&self) -> Result<Value, AppError> {
         let server_public = self.wg.ensure_server_keys()?.1;
-        let clients = self.wg.load_clients();
-        let forwardings = self.fwd.list_rules();
+        let clients = self.wg.load_clients()?;
+        let forwardings = self.fwd.list_rules()?;
         let status = self.wg.peer_status_map();
         let exports = self.load_profile_exports();
         let mut items = Vec::new();
@@ -151,7 +151,7 @@ impl ClientManager {
 
     pub fn record_profile_export(&self, name: &str, content: Option<&str>) -> Result<(), AppError> {
         let _guard = self.lock.lock().expect("client lock");
-        let clients = self.wg.load_clients();
+        let clients = self.wg.load_clients()?;
         let client = clients
             .iter()
             .find(|client| client.name == name)
@@ -189,7 +189,7 @@ impl ClientManager {
     pub fn create_client(&self, name: &str, address: Option<&str>) -> Result<Value, AppError> {
         let _guard = self.lock.lock().expect("client lock");
         validate_name(name)?;
-        let mut clients = self.wg.load_clients();
+        let mut clients = self.wg.load_clients()?;
         if clients.iter().any(|client| client.name == name) {
             return Err(AppError::validation("Client name already exists."));
         }
@@ -221,20 +221,25 @@ impl ClientManager {
             created_at: now_epoch(),
             extra: Map::new(),
         };
-        clients.push(client.clone());
-        self.wg.save_clients(&clients)?;
-        let server_public = self.wg.ensure_server_keys()?.1;
-        self.wg
-            .write_client_config(&client, &server_public, &clients)?;
-        self.wg.refresh_wireguard(&clients)?;
-        self.fwd.apply_all()?;
+        let previous = clients.clone();
+        clients.push(client);
+        if let Err(error) = self.apply_peer_changes(&previous, &clients, false, true, false, true) {
+            self.storage.remove(
+                &self
+                    .config
+                    .clients_dir
+                    .join(format!("{name}.conf"))
+                    .to_string_lossy(),
+            );
+            return Err(error);
+        }
         Ok(json!({"name": name, "config": format!("/clients/{name}.conf")}))
     }
 
     pub fn rename_client(&self, old_name: &str, new_name: &str) -> Result<Value, AppError> {
         let _guard = self.lock.lock().expect("client lock");
         validate_name(new_name)?;
-        let mut clients = self.wg.load_clients();
+        let mut clients = self.wg.load_clients()?;
         let index = clients
             .iter()
             .position(|client| client.name == old_name)
@@ -245,15 +250,9 @@ impl ClientManager {
         {
             return Err(AppError::validation("Client name already exists."));
         }
-        let old_conf = self.config.clients_dir.join(format!("{old_name}.conf"));
-        let new_conf = self.config.clients_dir.join(format!("{new_name}.conf"));
-        if self.storage.exists(&old_conf.to_string_lossy()) {
-            self.storage
-                .rename(&old_conf.to_string_lossy(), &new_conf.to_string_lossy());
-        }
-        clients[index].name = new_name.to_string();
-        self.wg.save_clients(&clients)?;
-        let mut exports = self.load_profile_exports();
+        let previous = clients.clone();
+        let previous_exports = self.load_profile_exports();
+        let mut exports = previous_exports.clone();
         if let Some(revision) = exports.remove(old_name) {
             exports.insert(new_name.to_string(), revision);
             let payload = exports
@@ -265,16 +264,44 @@ impl ClientManager {
             self.storage
                 .save_json(&self.profile_exports_path(), &Value::Object(payload))?;
         }
-        let server_public = self.wg.ensure_server_keys()?.1;
-        self.wg
-            .write_client_config(&clients[index], &server_public, &clients)?;
-        self.wg.refresh_wireguard(&clients)?;
+        clients[index].name = new_name.to_string();
+        if let Err(error) = self.apply_peer_changes(&previous, &clients, false, true, false, false)
+        {
+            let payload =
+                previous_exports
+                    .into_iter()
+                    .fold(Map::new(), |mut map, (name, revision)| {
+                        map.insert(name, Value::String(revision));
+                        map
+                    });
+            if let Err(rollback) = self
+                .storage
+                .save_json(&self.profile_exports_path(), &Value::Object(payload))
+            {
+                tracing::error!("Could not restore the previous profile exports: {rollback}");
+            }
+            self.storage.remove(
+                &self
+                    .config
+                    .clients_dir
+                    .join(format!("{new_name}.conf"))
+                    .to_string_lossy(),
+            );
+            return Err(error);
+        }
+        self.storage.remove(
+            &self
+                .config
+                .clients_dir
+                .join(format!("{old_name}.conf"))
+                .to_string_lossy(),
+        );
         Ok(json!({"name": new_name}))
     }
 
     pub fn update_options(&self, name: &str, raw: &Map<String, Value>) -> Result<Value, AppError> {
         let _guard = self.lock.lock().expect("client lock");
-        let clients = self.wg.load_clients();
+        let clients = self.wg.load_clients()?;
         let target = clients
             .iter()
             .find(|client| client.name == name)
@@ -294,7 +321,14 @@ impl ClientManager {
         if routes_changed {
             self.wg.check_local_routes(&settings.advertised_routes)?;
         }
-        self.apply_peer_changes(&clients, &updated, routes_changed, false, access_changed)?;
+        self.apply_peer_changes(
+            &clients,
+            &updated,
+            routes_changed,
+            false,
+            access_changed,
+            false,
+        )?;
         Ok(json!({"name": name, "options": Value::Object(settings.as_map())}))
     }
 
@@ -314,6 +348,7 @@ impl ClientManager {
         routes_changed: bool,
         refresh: bool,
         policy_changed: bool,
+        apply_firewall: bool,
     ) -> Result<(), AppError> {
         if routes_changed {
             self.wg.replace_routes(previous, updated)?;
@@ -324,7 +359,7 @@ impl ClientManager {
             if refresh && !routes_changed {
                 self.wg.refresh_wireguard(updated)?;
             }
-            if routes_changed || refresh || policy_changed {
+            if routes_changed || apply_firewall || policy_changed {
                 self.fwd.apply_all()?;
             }
             Ok(())
@@ -349,7 +384,7 @@ impl ClientManager {
                     );
                 }
             }
-            if refresh || routes_changed || policy_changed {
+            if routes_changed || apply_firewall || policy_changed {
                 if let Err(restore_error) = self.fwd.apply_all() {
                     tracing::error!(
                         "Could not restore the previous firewall state: {restore_error}"
@@ -363,7 +398,7 @@ impl ClientManager {
 
     pub fn delete_client(&self, name: &str) -> Result<Value, AppError> {
         let _guard = self.lock.lock().expect("client lock");
-        let clients = self.wg.load_clients();
+        let clients = self.wg.load_clients()?;
         let removed = clients
             .iter()
             .find(|client| client.name == name)
@@ -375,7 +410,7 @@ impl ClientManager {
             .cloned()
             .collect();
         let routed = !removed.options().advertised_routes.is_empty();
-        self.apply_peer_changes(&clients, &updated, routed, true, false)?;
+        self.apply_peer_changes(&clients, &updated, routed, true, false, true)?;
         self.storage.remove(
             &self
                 .config
@@ -401,7 +436,7 @@ impl ClientManager {
         let _guard = self.lock.lock().expect("client lock");
         if !self
             .wg
-            .load_clients()
+            .load_clients()?
             .iter()
             .any(|client| client.name == name)
         {
@@ -422,9 +457,9 @@ impl ClientManager {
     }
 
     pub fn bootstrap(&self) -> Result<(), AppError> {
-        self.wg.ensure_dirs();
+        self.wg.ensure_dirs()?;
         let (server_private, server_public) = self.wg.ensure_server_keys()?;
-        let mut clients = self.wg.load_clients();
+        let mut clients = self.wg.load_clients()?;
         if clients.is_empty() {
             let default_ip = self.wg.next_available_ip(&[])?;
             let (private_key, public_key) = self.wg.generate_keypair()?;

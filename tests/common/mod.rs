@@ -39,6 +39,8 @@ impl Setup {
         let runner = Arc::new(FakeRunner::new());
         runner.set_stdout("ip -j -4 route show table all", "[]");
         runner.set_stdout("ip -j -4 route show dev eth0", "[]");
+        runner.set_stdout("wg genkey", "private-key-test\n");
+        runner.set_stdout("wg pubkey", "public-key-test\n");
         let storage_trait: Arc<dyn Storage> = storage.clone();
         let runner_trait: Arc<dyn portbridge::runner::Runner> = runner.clone();
         let wg = Arc::new(WireGuardService::new(
@@ -65,6 +67,7 @@ impl Setup {
         let auth = Arc::new(Auth::new(
             storage.clone(),
             config.sessions_file.to_string_lossy().into_owned(),
+            config.secret_key().to_vec(),
         ));
         Self {
             _temp: temp,
@@ -217,7 +220,9 @@ pub async fn api_request(
     cookie: Option<&str>,
     body: Option<Value>,
 ) -> (StatusCode, HeaderMap, String) {
-    let (status, headers, bytes) = api_request_raw(app, method, uri, cookie, body).await;
+    let cookie = cookie.map(|token| format!("session={token}"));
+    let (status, headers, bytes) =
+        api_request_with_cookie_header(app, method, uri, cookie.as_deref(), body).await;
     (status, headers, String::from_utf8_lossy(&bytes).to_string())
 }
 
@@ -228,9 +233,20 @@ pub async fn api_request_raw(
     cookie: Option<&str>,
     body: Option<Value>,
 ) -> (StatusCode, HeaderMap, Vec<u8>) {
+    let cookie = cookie.map(|token| format!("session={token}"));
+    api_request_with_cookie_header(app, method, uri, cookie.as_deref(), body).await
+}
+
+pub async fn api_request_with_cookie_header(
+    app: Router,
+    method: Method,
+    uri: &str,
+    cookie_header: Option<&str>,
+    body: Option<Value>,
+) -> (StatusCode, HeaderMap, Vec<u8>) {
     let mut builder = Request::builder().method(method).uri(uri);
-    if let Some(cookie) = cookie {
-        builder = builder.header("Cookie", format!("session={cookie}"));
+    if let Some(cookie) = cookie_header {
+        builder = builder.header("Cookie", cookie);
     }
     let body = match body {
         Some(value) => {

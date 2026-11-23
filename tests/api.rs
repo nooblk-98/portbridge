@@ -3,7 +3,9 @@
 mod common;
 
 use axum::http::{Method, StatusCode};
-use common::{api_request, api_request_raw, client, with_options, Setup};
+use common::{
+    api_request, api_request_raw, api_request_with_cookie_header, client, with_options, Setup,
+};
 use portbridge::storage::Storage;
 use serde_json::json;
 
@@ -163,6 +165,38 @@ async fn login_rejects_missing_blank_and_non_string_passwords() {
 }
 
 #[tokio::test]
+async fn a_remember_cookie_is_not_promoted_into_a_session_cookie() {
+    let setup = seeded();
+    let app = setup.router();
+    let (status, headers, _) = api_request(
+        app.clone(),
+        Method::POST,
+        "/auth/login",
+        None,
+        Some(json!({"password": "test-password"})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let remember = headers
+        .get_all("set-cookie")
+        .iter()
+        .find_map(|value| {
+            let value = value.to_str().ok()?;
+            value
+                .starts_with("remember_token=")
+                .then(|| value.split(';').next().unwrap_or("").to_string())
+        })
+        .expect("remember cookie");
+    let (status, headers, _) =
+        api_request_with_cookie_header(app, Method::GET, "/api/state", Some(&remember), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        !headers.contains_key("set-cookie"),
+        "remember-only requests must not create a session cookie"
+    );
+}
+
+#[tokio::test]
 async fn logout_invalidates_a_copied_session_cookie() {
     let setup = seeded();
     let cookie = setup.cookie();
@@ -230,7 +264,7 @@ async fn clients_and_routes_are_exposed_by_the_api() {
         None,
     )
     .await;
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::OK, "{body}");
     let payload: serde_json::Value = serde_json::from_str(&body).unwrap();
     assert_eq!(payload["routes"][0]["cidr"], ROUTE);
     assert_eq!(

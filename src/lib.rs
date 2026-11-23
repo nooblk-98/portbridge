@@ -70,6 +70,7 @@ pub fn build_services_with(
     let auth = Arc::new(Auth::new(
         storage.clone(),
         config.sessions_file.to_string_lossy().into_owned(),
+        config.secret_key().to_vec(),
     ));
     Services {
         config,

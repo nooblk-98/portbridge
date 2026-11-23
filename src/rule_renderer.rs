@@ -28,41 +28,45 @@ pub fn parse_ipv4_network_lenient(value: &str) -> Option<Ipv4Net> {
     }
 }
 
-/// Translate a stored forwarding rule into iptables arguments.
-pub fn render_rule(rule: &Value, ext_iface: &str) -> Vec<IptablesCommand> {
-    let Some(object) = rule.as_object() else {
-        return Vec::new();
-    };
-    let port_value = object.get("port");
-    let port_text = match port_value {
+struct ParsedRule {
+    protocol: String,
+    is_range: bool,
+    start_port: u16,
+    end_port: u16,
+    dport_arg: String,
+    client_ip: Ipv4Addr,
+    target_port: Option<u16>,
+    source_ip: Option<String>,
+}
+
+fn parse_port(value: &str) -> Option<u16> {
+    value
+        .parse::<u16>()
+        .ok()
+        .filter(|port| (1..=65535).contains(port))
+}
+
+fn parse_rule(rule: &Value) -> Option<ParsedRule> {
+    let object = rule.as_object()?;
+    let port_text = match object.get("port") {
         Some(Value::String(text)) => text.clone(),
         Some(Value::Number(number)) => number.to_string(),
-        _ => {
-            tracing::error!("Skipping invalid rule {rule}: missing port");
-            return Vec::new();
-        }
+        _ => return None,
     };
     let is_range = port_text.contains('-');
     let (start_port, end_port, dport_arg) = if is_range {
-        let parts: Vec<&str> = port_text.split('-').collect();
-        if parts.len() != 2 {
-            tracing::error!("Skipping invalid rule {rule}: invalid range");
-            return Vec::new();
+        let (start, end) = port_text.split_once('-')?;
+        if end.contains('-') {
+            return None;
         }
-        let Ok(start) = parts[0].parse::<u16>() else {
-            tracing::error!("Skipping invalid rule {rule}: invalid range");
-            return Vec::new();
-        };
-        let Ok(end) = parts[1].parse::<u16>() else {
-            tracing::error!("Skipping invalid rule {rule}: invalid range");
-            return Vec::new();
-        };
+        let start = parse_port(start)?;
+        let end = parse_port(end)?;
+        if start >= end {
+            return None;
+        }
         (start, end, format!("{start}:{end}"))
     } else {
-        let Ok(port) = port_text.parse::<u16>() else {
-            tracing::error!("Skipping invalid rule {rule}: invalid port");
-            return Vec::new();
-        };
+        let port = parse_port(&port_text)?;
         (port, port, port.to_string())
     };
     let protocol = object
@@ -71,38 +75,34 @@ pub fn render_rule(rule: &Value, ext_iface: &str) -> Vec<IptablesCommand> {
         .unwrap_or("both")
         .to_lowercase();
     if !matches!(protocol.as_str(), "tcp" | "udp" | "both") {
-        return Vec::new();
+        return None;
     }
-    let Some(client_ip_text) = object.get("client_ip").and_then(Value::as_str) else {
-        tracing::error!("Skipping invalid rule {rule}: missing client_ip");
-        return Vec::new();
+    let client_ip = object
+        .get("client_ip")?
+        .as_str()?
+        .parse::<Ipv4Addr>()
+        .ok()?;
+    let target_supplied = object
+        .get("target_port")
+        .is_some_and(|value| !value.is_null());
+    let target_port = match object.get("target_port") {
+        None | Some(Value::Null) => {
+            if is_range {
+                None
+            } else {
+                Some(start_port)
+            }
+        }
+        Some(Value::Number(number)) => number
+            .as_u64()
+            .and_then(|value| u16::try_from(value).ok())
+            .filter(|port| (1..=65535).contains(port)),
+        Some(Value::String(text)) => parse_port(text),
+        _ => None,
     };
-    let Ok(client_ip) = client_ip_text.parse::<Ipv4Addr>() else {
-        tracing::error!("Skipping invalid rule {rule}: invalid client_ip");
-        return Vec::new();
-    };
-
-    let (to_dest, dest_port_arg) = if is_range {
-        (
-            format!("{client_ip}:{start_port}-{end_port}"),
-            dport_arg.clone(),
-        )
-    } else {
-        let target_port = match object.get("target_port") {
-            Some(Value::Number(number)) => number.as_i64(),
-            Some(Value::String(text)) => text.parse::<i64>().ok(),
-            _ => Some(start_port as i64),
-        };
-        let Some(target_port) = target_port else {
-            tracing::error!("Skipping invalid rule {rule}: invalid target_port");
-            return Vec::new();
-        };
-        (
-            format!("{client_ip}:{target_port}"),
-            target_port.to_string(),
-        )
-    };
-
+    if (target_supplied || !is_range) && target_port.is_none() {
+        return None;
+    }
     let source_ip = object
         .get("source_ip")
         .and_then(Value::as_str)
@@ -112,19 +112,52 @@ pub fn render_rule(rule: &Value, ext_iface: &str) -> Vec<IptablesCommand> {
     let source_ip = if source_ip.is_empty() {
         None
     } else {
-        match parse_ipv4_network_lenient(&source_ip) {
-            Some(network) => Some(network.to_string()),
-            None => {
-                tracing::error!("Skipping invalid rule {rule}: invalid source_ip");
-                return Vec::new();
-            }
-        }
+        Some(parse_ipv4_network_lenient(&source_ip)?.to_string())
     };
 
-    let protocols: Vec<&str> = if protocol == "both" {
+    Some(ParsedRule {
+        protocol,
+        is_range,
+        start_port,
+        end_port,
+        dport_arg,
+        client_ip,
+        target_port,
+        source_ip,
+    })
+}
+
+/// Whether a stored forwarding rule is safe to render and expose.
+pub fn rule_is_valid(rule: &Value) -> bool {
+    parse_rule(rule).is_some()
+}
+
+/// Translate a stored forwarding rule into iptables arguments.
+pub fn render_rule(rule: &Value, ext_iface: &str) -> Vec<IptablesCommand> {
+    let Some(parsed) = parse_rule(rule) else {
+        tracing::error!("Skipping invalid forwarding rule");
+        return Vec::new();
+    };
+    let (to_dest, dest_port_arg) = if parsed.is_range {
+        (
+            format!(
+                "{}:{}-{}",
+                parsed.client_ip, parsed.start_port, parsed.end_port
+            ),
+            parsed.dport_arg.clone(),
+        )
+    } else {
+        let target_port = parsed.target_port.expect("validated target port");
+        (
+            format!("{}:{target_port}", parsed.client_ip),
+            target_port.to_string(),
+        )
+    };
+
+    let protocols: Vec<&str> = if parsed.protocol == "both" {
         vec!["tcp", "udp"]
     } else {
-        vec![protocol.as_str()]
+        vec![parsed.protocol.as_str()]
     };
     let mut commands = Vec::new();
     for name in protocols {
@@ -134,13 +167,13 @@ pub fn render_rule(rule: &Value, ext_iface: &str) -> Vec<IptablesCommand> {
             arg("-p"),
             arg(name),
             arg("--dport"),
-            arg(dport_arg.clone()),
+            arg(parsed.dport_arg.clone()),
             arg("-j"),
             arg("DNAT"),
             arg("--to-destination"),
             arg(to_dest.clone()),
         ];
-        if let Some(source) = &source_ip {
+        if let Some(source) = &parsed.source_ip {
             dnat_args.push(arg("-s"));
             dnat_args.push(arg(source.clone()));
         }
@@ -153,17 +186,17 @@ pub fn render_rule(rule: &Value, ext_iface: &str) -> Vec<IptablesCommand> {
             arg("-p"),
             arg(name),
             arg("-d"),
-            arg(client_ip.to_string()),
+            arg(parsed.client_ip.to_string()),
             arg("--dport"),
             arg(dest_port_arg.clone()),
             arg("-m"),
             arg("conntrack"),
             arg("--ctorigdstport"),
-            arg(dport_arg.clone()),
+            arg(parsed.dport_arg.clone()),
             arg("-j"),
             arg("ACCEPT"),
         ];
-        if let Some(source) = &source_ip {
+        if let Some(source) = &parsed.source_ip {
             filter_args.push(arg("-s"));
             filter_args.push(arg(source.clone()));
         }

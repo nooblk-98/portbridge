@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::config::host_addresses;
+use crate::error::AppError;
+use crate::storage::Storage;
 
 pub const DEFAULT_DNS: &str = "1.1.1.1";
 pub const DEFAULT_KEEPALIVE: i64 = 25;
@@ -32,6 +34,51 @@ pub struct Client {
     pub created_at: i64,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
+}
+
+/// Load the persisted client list, refusing to silently discard corrupt or
+/// partly invalid records. Callers must not save over this state when it fails.
+pub fn load_clients(storage: &dyn Storage, path: &str) -> Result<Vec<Client>, AppError> {
+    if !storage.exists(path) {
+        return Ok(Vec::new());
+    }
+    let text = storage
+        .read_text(path)
+        .ok_or_else(|| AppError::runtime("Unable to read the client state file."))?;
+    let value: Value = serde_json::from_str(&text)
+        .map_err(|error| AppError::runtime(format!("Invalid client state file: {error}")))?;
+    let Value::Array(items) = value else {
+        return Err(AppError::runtime(
+            "Invalid client state file: expected a JSON array.",
+        ));
+    };
+    let mut clients = Vec::with_capacity(items.len());
+    let mut names = BTreeSet::new();
+    let mut addresses = BTreeSet::new();
+    let mut keys = BTreeSet::new();
+    for (index, item) in items.into_iter().enumerate() {
+        let client: Client = serde_json::from_value(item).map_err(|error| {
+            AppError::runtime(format!("Invalid client record {index}: {error}"))
+        })?;
+        let address = client.address_ip().ok_or_else(|| {
+            AppError::runtime(format!("Invalid client record {index}: invalid address."))
+        })?;
+        if client.name.is_empty() || client.public_key.is_empty() || client.private_key.is_empty() {
+            return Err(AppError::runtime(format!(
+                "Invalid client record {index}: missing name or key."
+            )));
+        }
+        if !names.insert(client.name.clone())
+            || !addresses.insert(address)
+            || !keys.insert(client.public_key.clone())
+        {
+            return Err(AppError::runtime(format!(
+                "Invalid client record {index}: duplicate name, address or public key."
+            )));
+        }
+        clients.push(client);
+    }
+    Ok(clients)
 }
 
 impl Client {

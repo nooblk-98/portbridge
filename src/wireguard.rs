@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use ipnet::Ipv4Net;
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use crate::config::Config;
 use crate::error::AppError;
@@ -44,11 +44,11 @@ impl WireGuardService {
             .into_owned()
     }
 
-    pub fn ensure_dirs(&self) {
-        let _ = crate::storage::secure_directory(&self.config.data_dir);
-        let _ = crate::storage::secure_directory(&self.config.clients_dir);
+    pub fn ensure_dirs(&self) -> Result<(), AppError> {
+        crate::storage::create_private_directory(&self.config.data_dir)?;
+        crate::storage::secure_app_directory(&self.config.clients_dir)?;
         if let Some(parent) = self.config.wg_config_path.parent() {
-            let _ = crate::storage::secure_directory_if_safe(parent);
+            crate::storage::create_private_directory(parent)?;
         }
         for path in [
             self.config.data_dir.join("server.privatekey"),
@@ -59,15 +59,20 @@ impl WireGuardService {
             self.config.forward_file.clone(),
             self.config.wg_config_path.clone(),
         ] {
-            crate::storage::normalize_private_file(&path);
+            crate::storage::normalize_private_file(&path)?;
         }
-        if let Ok(entries) = std::fs::read_dir(&self.config.clients_dir) {
-            for entry in entries.flatten() {
-                if entry.path().extension().and_then(|value| value.to_str()) == Some("conf") {
-                    crate::storage::normalize_private_file(&entry.path());
+        match std::fs::read_dir(&self.config.clients_dir) {
+            Ok(entries) => {
+                for entry in entries.flatten() {
+                    if entry.path().extension().and_then(|value| value.to_str()) == Some("conf") {
+                        crate::storage::normalize_private_file(&entry.path())?;
+                    }
                 }
             }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
         }
+        Ok(())
     }
 
     pub fn ensure_server_keys(&self) -> Result<(String, String), AppError> {
@@ -96,11 +101,11 @@ impl WireGuardService {
                 .write_text(&private_path_text, &format!("{private}\n"))?;
             self.storage
                 .write_text(&public_path_text, &format!("{public}\n"))?;
-            set_private_permissions(&private_path);
-            set_private_permissions(&public_path);
+            crate::storage::set_private_file(&private_path)?;
+            crate::storage::set_private_file(&public_path)?;
         }
-        crate::storage::normalize_private_file(&private_path);
-        crate::storage::normalize_private_file(&public_path);
+        crate::storage::normalize_private_file(&private_path)?;
+        crate::storage::normalize_private_file(&public_path)?;
         let private = self
             .storage
             .read_text(&private_path_text)
@@ -136,18 +141,11 @@ impl WireGuardService {
         Ok((private, public))
     }
 
-    pub fn load_clients(&self) -> Vec<Client> {
-        let raw = self
-            .storage
-            .load_json(&self.config.clients_file.to_string_lossy(), json!([]));
-        let Value::Array(items) = raw else {
-            return Vec::new();
-        };
-        items
-            .into_iter()
-            .filter_map(|item| serde_json::from_value::<Client>(item).ok())
-            .filter(|client| client.address_ip().is_some())
-            .collect()
+    pub fn load_clients(&self) -> Result<Vec<Client>, AppError> {
+        crate::model::load_clients(
+            self.storage.as_ref(),
+            &self.config.clients_file.to_string_lossy(),
+        )
     }
 
     pub fn save_clients(&self, clients: &[Client]) -> Result<(), AppError> {
@@ -216,7 +214,7 @@ impl WireGuardService {
         let content = self.render_client_config(client, server_public, clients);
         let path = self.client_conf_path(&client.name);
         self.storage.write_text(&path, &content)?;
-        set_private_permissions(std::path::Path::new(&path));
+        crate::storage::set_private_file(std::path::Path::new(&path))?;
         Ok(path)
     }
 
@@ -251,7 +249,7 @@ impl WireGuardService {
         }
         let path = self.config.wg_config_path.to_string_lossy().into_owned();
         self.storage.write_text(&path, &lines.join("\n"))?;
-        set_private_permissions(&self.config.wg_config_path);
+        crate::storage::set_private_file(&self.config.wg_config_path)?;
         Ok(())
     }
 
@@ -462,16 +460,4 @@ impl WireGuardService {
 
 fn args(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| value.to_string()).collect()
-}
-
-fn set_private_permissions(path: &std::path::Path) {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        if let Ok(metadata) = std::fs::metadata(path) {
-            let mut permissions = metadata.permissions();
-            permissions.set_mode(0o600);
-            let _ = std::fs::set_permissions(path, permissions);
-        }
-    }
 }

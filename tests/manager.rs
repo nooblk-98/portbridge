@@ -270,3 +270,99 @@ fn invalid_access_input_is_rejected_before_any_state_change() {
         assert_eq!(setup.clients(), before);
     }
 }
+
+#[test]
+fn failed_create_rolls_back_client_state_and_profile() {
+    let setup = Setup::new();
+    seed_fixture(&setup);
+    let before = setup.clients();
+    setup.runner.fail_next("wg syncconf", 1);
+    setup.runner.fail_next("wg-quick up", 1);
+    let error = setup
+        .manager
+        .create_client("new-peer", Some("10.8.0.9"))
+        .expect_err("refresh failure");
+    assert!(error.to_string().contains("Command failed"), "{error}");
+    assert_eq!(setup.clients(), before);
+    assert!(!setup.storage.exists(
+        &setup
+            .config
+            .clients_dir
+            .join("new-peer.conf")
+            .to_string_lossy()
+    ));
+}
+
+#[test]
+fn failed_rename_rolls_back_name_profile_and_exports() {
+    let setup = Setup::new();
+    seed_fixture(&setup);
+    setup
+        .manager
+        .record_profile_export("owner", None)
+        .expect("export");
+    let before = setup.clients();
+    setup.runner.fail_next("wg syncconf", 1);
+    setup.runner.fail_next("wg-quick up", 1);
+    let error = setup
+        .manager
+        .rename_client("owner", "owner-renamed")
+        .expect_err("refresh failure");
+    assert!(error.to_string().contains("Command failed"), "{error}");
+    assert_eq!(setup.clients(), before);
+    assert!(setup.storage.exists(
+        &setup
+            .config
+            .clients_dir
+            .join("owner.conf")
+            .to_string_lossy()
+    ));
+    assert!(!setup.storage.exists(
+        &setup
+            .config
+            .clients_dir
+            .join("owner-renamed.conf")
+            .to_string_lossy()
+    ));
+    let exports = setup
+        .storage
+        .read_text(
+            &setup
+                .config
+                .data_dir
+                .join("profile_exports.json")
+                .to_string_lossy(),
+        )
+        .expect("exports");
+    assert!(exports.contains("\"owner\""));
+    assert!(!exports.contains("owner-renamed"));
+}
+
+#[test]
+fn corrupt_client_state_fails_visibly_without_overwriting() {
+    let setup = Setup::new();
+    seed_fixture(&setup);
+    let path = setup.config.clients_file.to_string_lossy().into_owned();
+    let corrupt = "{\"not\":\"an array\"";
+    setup.storage.write_text(&path, corrupt).expect("write");
+    assert!(setup.manager.list_clients().is_err());
+    assert!(setup.manager.bootstrap().is_err());
+    assert_eq!(setup.storage.read_text(&path).as_deref(), Some(corrupt));
+}
+
+#[test]
+fn partly_invalid_client_state_fails_without_overwriting() {
+    let setup = Setup::new();
+    seed_fixture(&setup);
+    let path = setup.config.clients_file.to_string_lossy().into_owned();
+    let original = setup.storage.read_text(&path).expect("client state");
+    let mut items: Vec<Value> = serde_json::from_str(&original).expect("clients");
+    items.push(json!({"name": "broken"}));
+    let partial = serde_json::to_string(&items).expect("json");
+    setup.storage.write_text(&path, &partial).expect("write");
+    assert!(setup.manager.list_clients().is_err());
+    assert_eq!(
+        setup.storage.read_text(&path).as_deref(),
+        Some(partial.as_str())
+    );
+}

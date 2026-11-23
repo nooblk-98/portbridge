@@ -278,7 +278,7 @@ async fn api_state(State(state): State<AppState>, headers: HeaderMap) -> Respons
     }
     let result = (|| -> Result<Value, AppError> {
         let clients = state.client_manager.list_clients()?;
-        let forwardings = state.forwarding_manager.list_rules();
+        let forwardings = state.forwarding_manager.list_rules()?;
         Ok(json!({
             "endpoint": format!("{}:{}", state.config.wg_host, state.config.wg_port),
             "interface": state.config.wg_interface,
@@ -468,10 +468,10 @@ async fn api_forwardings(State(state): State<AppState>, headers: HeaderMap) -> R
     if let Some(response) = require_auth(&state, &headers) {
         return response;
     }
-    json_response(
-        StatusCode::OK,
-        json!({"items": state.forwarding_manager.list_rules()}),
-    )
+    match state.forwarding_manager.list_rules() {
+        Ok(items) => json_response(StatusCode::OK, json!({"items": items})),
+        Err(error) => error.into_response(),
+    }
 }
 
 async fn api_add_forwarding(

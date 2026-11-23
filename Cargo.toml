@@ -12,6 +12,7 @@ doctest = false
 [dependencies]
 axum = "0.8"
 base64 = "0.22"
+hmac = "0.12"
 ipnet = "2"
 minijinja = "2"
 png = "0.17"
