@@ -16,14 +16,14 @@ The Rust backend was checked against the Python reference with
   fixed `.secret_key`. Every key and the secret are obvious TEST values
   (`private-key-owner`, `0123456789abcdef0123456789abcdef`), not credentials.
   The recorded cases carry a session cookie signed with that test-only key.
-- `parity/run_rust.sh` — copies the seed into `$FAKE_STATE/data`, sets the
+- `parity/run_rust.sh` — copies the seed into a fresh run directory under `$FAKE_STATE`, sets the
   environment and starts `target/release/portbridge` on the requested port.
 
 ## Replay
 
 ```sh
 cargo build --release
-export FAKE_STATE="$PWD/parity/state"
+export FAKE_STATE="$(mktemp -d)"
 rust-anything app replay . --build "bash parity/run_rust.sh {port}"
 ```
 

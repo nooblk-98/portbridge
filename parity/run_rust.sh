@@ -2,13 +2,14 @@
 set -euo pipefail
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 port=${1:?port}
-state=${FAKE_STATE:?FAKE_STATE must point at the harness state directory}
-mkdir -p "$state"
-rm -rf "$state/data"
+state_parent=${FAKE_STATE:?FAKE_STATE must point at the harness state directory}
+mkdir -p "$state_parent"
+export FAKE_STATE
+FAKE_STATE=$(mktemp -d "$state_parent/run.XXXXXXXX")
+state=$FAKE_STATE
 cp -R "$repo/parity/seed-data" "$state/data"
 : >"$state/commands.log"
 : >"$state/restore.log"
-rm -f "$state/genkey.count"
 export PATH="$repo/parity/fakebin:$PATH"
 export APP_HOST=127.0.0.1
 export APP_PORT="$port"

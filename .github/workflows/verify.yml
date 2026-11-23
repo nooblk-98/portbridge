@@ -48,8 +48,8 @@ jobs:
             test -x /usr/local/bin/portbridge
             test -f /app/app/templates/login.html
             test -f /app/app/static/js/app.js
-            ! command -v python3
-            ! command -v pip3
+            test -z "$(command -v python3)"
+            test -z "$(command -v pip3)"
           '
 
   installer:
