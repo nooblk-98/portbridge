@@ -18,6 +18,63 @@ PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptabl
 - **Split tunnel by default**: devices keep their own internet connection and IP. Switch a peer to full tunnel from its card when you want its traffic to leave through the server.
 - **Safe defaults**: passwords are stored as salted hashes, logins are rate limited, and peers can only reach each other through routes you approve.
 
+**Jump to:** [Features](#features-and-capabilities) · [Quick start](#quick-start) · [Docker Compose](#docker-compose) · [Build from source](#build-from-source) · [Debian or Ubuntu](#debian-or-ubuntu-no-docker) · [Usage](#usage) · [Configuration](#configuration) · [Upgrading](#upgrading)
+
+## Features and capabilities
+
+**Peers and onboarding**
+
+- Create, rename and delete WireGuard peers from the dashboard. Each peer gets its own key pair and the next free tunnel address, or one you choose.
+- Give a device its profile as a `.conf` download or a QR code for the WireGuard app. Downloads are never cached.
+- Per-peer settings: DNS servers, MTU (1280 to 9000), keepalive (25 seconds by default, 0 turns it off), and split or full tunnel.
+- Each peer gets a generated cartoon avatar that survives a rename.
+- Tracks which devices still need to import an updated profile, with a banner and a one-click **Imported** confirmation.
+
+**Private networking**
+
+- A hub-and-spoke WireGuard network (default `10.8.0.0/24`). Devices behind NAT or CGNAT dial out, so they need no open inbound port.
+- Share a host or subnet from any peer by advertising up to 32 IPv4 routes: the private ranges and `100.64.0.0/10`. Overlaps with the VPN subnet or the server's own routes are refused.
+- **Route access control**: each route is open to every peer, limited to the peers you pick, or blocked. Everything else is dropped by the firewall.
+- A per-peer **Server access** switch, so Docker containers and reverse proxies on the server, such as Nginx Proxy Manager, can reach that peer's services.
+- Works as a bastion (jump) host for machines with no public address.
+
+**Public forwarding**
+
+- Publish a TCP port, a UDP port, or both, or a whole port range, on the server and send it to a service on a peer, optionally on a different service port.
+- Restrict a rule to a source IP or CIDR.
+- Rules are added and removed live, with a confirmation before removal, and each one also shows on its peer's card.
+
+**Dashboard and monitoring**
+
+- Peers online, and when each of the others was last seen.
+- Total traffic with a download and upload split, and the last 24 hours.
+- Traffic over time for the last hour, 24 hours or 7 days, and the busiest peers.
+- Health checks for the WireGuard interface and port, peers, firewall rules, IP forwarding and internet access.
+- Server CPU, memory, disk, load average and uptime.
+- A notice when a newer release exists, with its changelog and the upgrade command to copy. Nothing upgrades by itself.
+
+**Security**
+
+- The password is stored as a salted PBKDF2-SHA256 hash (600,000 iterations), or you supply the hash yourself, and it is compared in constant time.
+- Server-side sessions that expire, `HttpOnly` cookies, and a login rate limit of 5 attempts a minute.
+- A default-deny firewall: between peers and the outside, only established traffic and the routes you approved are allowed. Internet access through the server can be switched off with `ALLOW_INTERNET_EGRESS=0`.
+- A Content-Security-Policy that restricts scripts to the dashboard's own files, and authenticated pages and downloads are never cached.
+- On Debian or Ubuntu the service runs under a hardened systemd unit (no new privileges, a read-only system), and the installer verifies each release's SHA-256 checksum.
+
+**Install and operate**
+
+- Run the published Docker image, or install natively on Debian or Ubuntu with one command, or build from source. Static x86_64 and arm64 binaries need no Rust toolchain.
+- Upgrade or remove with one command (`--upgrade`, `--uninstall`, `--purge`). An upgrade keeps your settings, peers and keys.
+- Configured with environment variables only. State is plain JSON files under `DATA_DIR`, so there is no database to run or back up separately.
+- Light and dark themes that follow your system or your choice, a layout that works on a phone, and dialogs that trap focus and close with Escape.
+
+**Good to know**
+
+- It is a hub and spoke, not a mesh: traffic between peers passes through your server, and peers do not connect to each other directly.
+- There is one admin login, with no per-user accounts or roles.
+- The tunnel network and routes are IPv4, and the server runs Linux with WireGuard and iptables.
+- The dashboard is served over plain HTTP, so put it behind an HTTPS reverse proxy.
+
 ## Private by default, public when you choose
 
 Nothing a peer runs is reachable from the internet unless you decide it should be. You have two ways to reach a service, and both are managed from the dashboard:
@@ -102,6 +159,8 @@ ssh -J ubuntu@vpn.example.com user@10.10.0.2
 
 You need a server with a public IP or DNS name, and UDP 51820 allowed through its firewall and your provider's.
 
+Pick one: [Docker Compose](#docker-compose), [Build from source](#build-from-source), or [Debian or Ubuntu without Docker](#debian-or-ubuntu-no-docker).
+
 ### Docker Compose
 
 Create a `.env` file with your server's address and a strong dashboard password:
@@ -124,6 +183,19 @@ The dashboard is then available at `http://vpn.example.com:3000`. Allow TCP 3000
 
 > [!WARNING]
 > The dashboard is served over plain HTTP, so your password is sent unencrypted. Put it behind an HTTPS reverse proxy, restrict port 3000 to trusted addresses in your firewall, or bind it to localhost (`APP_HOST=127.0.0.1`, or `"127.0.0.1:3000:3000/tcp"` in Compose) and use an SSH tunnel: `ssh -N -L 3000:127.0.0.1:3000 user@vpn.example.com`.
+
+### Build from source
+
+Install `build-essential` and Rust 1.85 or newer, then build the binary and install it with the same script (it uses your binary instead of downloading a release):
+
+```sh
+git clone https://github.com/nooblk-98/portbridge.git
+cd portbridge
+cargo build --release --locked --bin portbridge
+sudo PORTBRIDGE_BINARY="$PWD/target/release/portbridge" bash install.sh vpn.example.com
+```
+
+To build and run it in Docker instead, use `docker compose up -d --build`. To work on the code, see [Development](#development).
 
 ### Debian or Ubuntu (no Docker)
 
@@ -156,20 +228,6 @@ curl -fsSL https://raw.githubusercontent.com/nooblk-98/portbridge/main/install.s
 ```
 
 An upgrade keeps your settings, peers and keys. An uninstall keeps peers and keys in `/var/lib/portbridge` unless you add `--purge`.
-
-<details>
-<summary>Build from source</summary>
-
-Install `build-essential` and Rust 1.85 or newer, then:
-
-```sh
-git clone https://github.com/nooblk-98/portbridge.git
-cd portbridge
-cargo build --release --locked --bin portbridge
-sudo PORTBRIDGE_BINARY="$PWD/target/release/portbridge" bash install.sh vpn.example.com
-```
-
-</details>
 
 ## Usage
 
