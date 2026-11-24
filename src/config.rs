@@ -210,7 +210,12 @@ impl Config {
             filter_chain: "WG_FORWARDER_FWD".to_string(),
             template_dir,
             static_dir,
-            allow_internet_egress: env::var("ALLOW_INTERNET_EGRESS").as_deref() == Ok("1"),
+            // Peers may reach the internet through the server unless this is
+            // switched off with ALLOW_INTERNET_EGRESS=0.
+            allow_internet_egress: !matches!(
+                env::var("ALLOW_INTERNET_EGRESS").as_deref(),
+                Ok("0" | "false")
+            ),
             seed_forwarding: env::var("SEED_FORWARDING").as_deref() == Ok("1"),
             enable_ipv4_forwarding: env::var("ENABLE_IPV4_FORWARDING").as_deref() == Ok("1"),
             secret_key,

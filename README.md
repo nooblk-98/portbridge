@@ -15,7 +15,7 @@ PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptabl
 - **Private access**: share a host or subnet with other peers over WireGuard, with per-route access control.
 - **Public forwarding**: publish a TCP or UDP port on the server and send it to a service on a peer, with optional source IP restrictions.
 - **Easy onboarding**: create peers in the UI, then download the config or scan a QR code.
-- **Hardened by default**: peer internet egress is blocked unless you enable it, and the dashboard listens on localhost.
+- **Safe dashboard defaults**: the dashboard listens on localhost, passwords are stored as salted hashes, and peers can only reach each other through routes you approve.
 
 ## Quick start
 
@@ -121,7 +121,7 @@ The service sees the original client address, so its replies must return through
 
 ### Internet access through the VPN
 
-Peer internet access is blocked by default. To use the server as a gateway, set `ALLOW_INTERNET_EGRESS=1` in `/etc/portbridge/portbridge.env` (or the Compose service environment) and restart. Devices with full-tunnel profiles will then route IPv4 internet traffic through the server.
+Peers can reach the internet through the server by default. Devices with full-tunnel profiles send their IPv4 internet traffic through it. To block this, set `ALLOW_INTERNET_EGRESS=0` in `/etc/portbridge/portbridge.env` (or the Compose service environment) and restart. Devices on split-tunnel profiles only send VPN traffic through the tunnel either way.
 
 ## Configuration
 
@@ -137,7 +137,7 @@ PortBridge is configured through environment variables.
 | `WG_INTERFACE` | `wg0` | WireGuard interface name |
 | `APP_HOST` / `APP_PORT` | `0.0.0.0` / `3000` | Dashboard bind address |
 | `DATA_DIR` | `/data` | Where keys and state are stored |
-| `ALLOW_INTERNET_EGRESS` | unset | Set to `1` to allow peer internet egress |
+| `ALLOW_INTERNET_EGRESS` | allowed | Set to `0` to block peer internet access through the server |
 
 ## Upgrading
 
