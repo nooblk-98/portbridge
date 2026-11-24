@@ -1,0 +1,51 @@
+<!-- Profiles that changed (for example a new advertised route) and must be imported again -->
+<section x-show="importNotices.length > 0" x-cloak class="pb-notice" role="status" aria-live="polite"
+    aria-labelledby="import-notice-title">
+    <span class="material-symbols-rounded pb-notice__icon" aria-hidden="true">sync_problem</span>
+    <div class="pb-notice__body">
+        <h2 id="import-notice-title" class="pb-notice__title">
+            <span x-text="importNotices.length === 1 ? '1 peer needs to import its updated profile' : importNotices.length + ' peers need to import their updated profiles'"></span>
+        </h2>
+        <p class="pb-notice__text">
+            WireGuard cannot push new routes to a device. Download each profile again, import it over the old
+            tunnel on that device, then switch the tunnel off and on. Press <strong>Imported</strong> when done.
+        </p>
+        <ul class="pb-notice__list">
+            <template x-for="notice in importNotices" :key="'notice-' + notice.name">
+                <li class="pb-notice__row">
+                    <div class="pb-notice__peer">
+                        <span class="pb-mono" x-text="notice.name"></span>
+                        <template x-if="notice.routes.length > 0">
+                            <span class="pb-notice__routes">
+                                New:
+                                <template x-for="route in notice.routes" :key="route.cidr + route.owner">
+                                    <span class="pb-route-chip" x-text="route.cidr" :title="'Advertised by ' + route.owner"></span>
+                                </template>
+                            </span>
+                        </template>
+                        <template x-if="notice.routes.length === 0">
+                            <span class="pb-notice__routes">Its profile changed.</span>
+                        </template>
+                    </div>
+                    <div class="pb-notice__actions">
+                        <a class="pb-notice__btn" :href="'/clients/' + encodeURIComponent(notice.name) + '.conf'"
+                            :aria-label="'Download profile for ' + notice.name">
+                            <span class="material-symbols-rounded" aria-hidden="true">download</span>
+                            Profile
+                        </a>
+                        <button type="button" class="pb-notice__btn pb-notice__btn--primary" :disabled="importBusy"
+                            @click="acknowledgeImports(notice.name)"
+                            :aria-label="'Mark ' + notice.name + ' as imported'">
+                            <span class="material-symbols-rounded" aria-hidden="true">check</span>
+                            Imported
+                        </button>
+                    </div>
+                </li>
+            </template>
+        </ul>
+        <button type="button" class="pb-notice__all" x-show="importNotices.length > 1" :disabled="importBusy"
+            @click="acknowledgeImports()">
+            Mark all as imported
+        </button>
+    </div>
+</section>

@@ -40,6 +40,8 @@ function app() {
         splitTunnelProfiles: [],
         profileRows: [],
         profilesNeedingExport: 0,
+        importNotices: [],
+        importBusy: false,
         splitTunnelProfilesAvailable: false,
         searchClient: '',
         activeClient: null,
@@ -183,6 +185,29 @@ function app() {
                 this.showToast(details?.description || 'Could not change split tunnel', 'error');
             } finally {
                 input.disabled = false;
+            }
+        },
+
+        /** Confirm that peers imported their updated profiles on the device (all when no name is given). */
+        async acknowledgeImports(name) {
+            const names = name ? [name] : this.importNotices.map(notice => notice.name);
+            if (names.length === 0 || this.importBusy) return;
+            this.importBusy = true;
+            try {
+                for (const peer of names) {
+                    await fetch(`/api/clients/${encodeURIComponent(peer)}/profile-imported`, {
+                        method: 'POST',
+                    }).then(this.checkAuth);
+                }
+                this.showToast(names.length === 1
+                    ? `Marked ${names[0]} as imported.`
+                    : `Marked ${names.length} peers as imported.`);
+                await this.loadData();
+            } catch (error) {
+                const details = error instanceof Response ? await error.json().catch(() => null) : null;
+                this.showToast(details?.description || 'Could not record the import', 'error');
+            } finally {
+                this.importBusy = false;
             }
         },
 
@@ -646,6 +671,12 @@ function app() {
                 };
             });
             this.profilesNeedingExport = this.profileRows.filter(row => row.status_tone === 'warn').length;
+            this.importNotices = this.splitTunnelProfiles
+                .filter(profile => profile && profile.import_required === true)
+                .map(profile => ({
+                    name: profile.name,
+                    routes: Array.isArray(profile.new_routes) ? profile.new_routes : [],
+                }));
         },
 
         editRouteAccess(route) {

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -49,6 +49,7 @@ impl ClientManager {
         let forwardings = self.fwd.list_rules()?;
         let status = self.wg.peer_status_map();
         let exports = self.load_profile_exports();
+        let acks = self.load_profile_acks();
         let mut items = Vec::new();
         let mut routes = Vec::new();
         let mut profiles = Vec::new();
@@ -98,9 +99,39 @@ impl ClientManager {
             if options.split_tunnel {
                 let exported = exports.get(&client.name);
                 let current = self.profile_revision(client, &clients, Some(&server_public));
+                // The administrator's confirmation wins over a download: a profile
+                // that was downloaded is not necessarily imported on the device.
+                let ack = acks.get(&client.name);
+                let ack_revision = ack
+                    .and_then(|entry| entry.get("revision"))
+                    .and_then(Value::as_str);
+                let import_required = match ack_revision {
+                    Some(revision) => Some(revision != current),
+                    None => exported.map(|revision| revision != &current),
+                };
+                let acked_routes: BTreeSet<String> = ack
+                    .and_then(|entry| entry.get("routes"))
+                    .and_then(Value::as_array)
+                    .map(|list| {
+                        list.iter()
+                            .filter_map(|route| route.as_str().map(str::to_string))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let new_routes: Vec<Value> = if import_required == Some(true) {
+                    self.reachable_routes(client, &clients)
+                        .into_iter()
+                        .filter(|(cidr, _)| !acked_routes.contains(cidr))
+                        .map(|(cidr, owner)| json!({"cidr": cidr, "owner": owner}))
+                        .collect()
+                } else {
+                    Vec::new()
+                };
                 profiles.push(json!({
                     "name": client.name,
                     "profile_refresh_required": exported.map(|revision| revision != &current),
+                    "import_required": import_required,
+                    "new_routes": new_routes,
                 }));
             }
         }
@@ -110,6 +141,86 @@ impl ClientManager {
             "routes": routes,
             "split_tunnel_profiles": profiles,
         }))
+    }
+
+    /// The advertised routes of other peers that this peer's profile sends
+    /// through the tunnel, as (cidr, owner name), sorted.
+    fn reachable_routes(&self, client: &Client, clients: &[Client]) -> BTreeSet<(String, String)> {
+        let mut routes = BTreeSet::new();
+        for owner in clients {
+            if owner.public_key == client.public_key {
+                continue;
+            }
+            for route in owner.options().advertised_routes {
+                let allowed = allowed_recipient_keys(owner, &route, clients);
+                if allowed.is_none_or(|keys| keys.contains(&client.public_key)) {
+                    routes.insert((route, owner.name.clone()));
+                }
+            }
+        }
+        routes
+    }
+
+    fn profile_acks_path(&self) -> String {
+        self.config
+            .data_dir
+            .join("profile_acks.json")
+            .to_string_lossy()
+            .into_owned()
+    }
+
+    /// Per peer: the profile revision and routes the administrator confirmed as
+    /// imported on the device.
+    fn load_profile_acks(&self) -> Map<String, Value> {
+        self.storage
+            .load_json(&self.profile_acks_path(), json!({}))
+            .as_object()
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    fn save_profile_acks(&self, acks: Map<String, Value>) -> Result<(), AppError> {
+        self.storage
+            .save_json(&self.profile_acks_path(), &Value::Object(acks))
+    }
+
+    fn ack_entry(&self, client: &Client, clients: &[Client], revision: &str) -> Value {
+        let routes: Vec<String> = self
+            .reachable_routes(client, clients)
+            .into_iter()
+            .map(|(cidr, _)| cidr)
+            .collect();
+        json!({"revision": revision, "routes": routes})
+    }
+
+    /// Record that the peer's current profile is imported on its device.
+    pub fn acknowledge_profile(&self, name: &str) -> Result<Value, AppError> {
+        let _guard = self.lock.lock().expect("client lock");
+        let clients = self.wg.load_clients()?;
+        let client = clients
+            .iter()
+            .find(|client| client.name == name)
+            .ok_or_else(|| AppError::not_found("Client not found."))?;
+        let server_public = self.wg.ensure_server_keys()?.1;
+        let revision = self.profile_revision(client, &clients, Some(&server_public));
+        let mut acks = self.load_profile_acks();
+        acks.insert(
+            name.to_string(),
+            self.ack_entry(client, &clients, &revision),
+        );
+        self.save_profile_acks(acks)?;
+        // Importing implies the profile was exported, so the Routes page agrees.
+        let mut exports = self.load_profile_exports();
+        exports.insert(name.to_string(), revision);
+        let payload = exports
+            .into_iter()
+            .fold(Map::new(), |mut map, (name, revision)| {
+                map.insert(name, Value::String(revision));
+                map
+            });
+        self.storage
+            .save_json(&self.profile_exports_path(), &Value::Object(payload))?;
+        Ok(json!({"name": name}))
     }
 
     fn profile_exports_path(&self) -> String {
@@ -183,8 +294,18 @@ impl ClientManager {
                 }
             },
         };
+        let revision = sha256_hex(&content);
+        let mut acks = self.load_profile_acks();
+        if !acks.contains_key(name) {
+            // The first export is the baseline; later changes raise the notice.
+            acks.insert(
+                name.to_string(),
+                self.ack_entry(client, &clients, &revision),
+            );
+            self.save_profile_acks(acks)?;
+        }
         let mut exports = self.load_profile_exports();
-        exports.insert(name.to_string(), sha256_hex(&content));
+        exports.insert(name.to_string(), revision);
         let payload = exports
             .into_iter()
             .fold(Map::new(), |mut map, (name, revision)| {
@@ -274,6 +395,13 @@ impl ClientManager {
             self.storage
                 .save_json(&self.profile_exports_path(), &Value::Object(payload))?;
         }
+        let previous_acks = self.load_profile_acks();
+        if let Some(entry) = previous_acks.get(old_name) {
+            let mut acks = previous_acks.clone();
+            acks.remove(old_name);
+            acks.insert(new_name.to_string(), entry.clone());
+            self.save_profile_acks(acks)?;
+        }
         clients[index].name = new_name.to_string();
         if let Err(error) = self.apply_peer_changes(&previous, &clients, false, true, false, false)
         {
@@ -289,6 +417,11 @@ impl ClientManager {
                 .save_json(&self.profile_exports_path(), &Value::Object(payload))
             {
                 tracing::error!("Could not restore the previous profile exports: {rollback}");
+            }
+            if let Err(rollback) = self.save_profile_acks(previous_acks) {
+                tracing::error!(
+                    "Could not restore the previous profile acknowledgements: {rollback}"
+                );
             }
             self.storage.remove(
                 &self
@@ -428,6 +561,10 @@ impl ClientManager {
                 .join(format!("{name}.conf"))
                 .to_string_lossy(),
         );
+        let mut acks = self.load_profile_acks();
+        if acks.remove(name).is_some() {
+            self.save_profile_acks(acks)?;
+        }
         let mut exports = self.load_profile_exports();
         if exports.remove(name).is_some() {
             let payload = exports

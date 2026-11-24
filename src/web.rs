@@ -84,6 +84,10 @@ pub fn router(state: AppState) -> Router {
             patch(api_rename_client).delete(api_delete_client),
         )
         .route("/api/clients/{name}/options", patch(api_peer_options))
+        .route(
+            "/api/clients/{name}/profile-imported",
+            post(api_profile_imported),
+        )
         .route("/clients/{file}", get(download_or_qr))
         .route(
             "/api/forwardings",
@@ -431,6 +435,20 @@ async fn api_peer_options(
         return AppError::validation("Invalid peer options.").into_response();
     };
     match state.client_manager.update_options(&name, options) {
+        Ok(value) => json_response(StatusCode::OK, value),
+        Err(error) => error.into_response(),
+    }
+}
+
+async fn api_profile_imported(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(name): Path<String>,
+) -> Response {
+    if let Some(response) = require_auth(&state, &headers) {
+        return response;
+    }
+    match state.client_manager.acknowledge_profile(&name) {
         Ok(value) => json_response(StatusCode::OK, value),
         Err(error) => error.into_response(),
     }

@@ -5,6 +5,17 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.4.0] - 2026-11-24
+
+### Added
+
+- **A notice when peers must import an updated profile.** After a route is
+  advertised or its access changes, the dashboard shows a banner listing the
+  split-tunnel peers whose profile changed, with the new routes, a link to
+  download the profile and an **Imported** button. The notice stays until you
+  confirm the import, even if you downloaded the profile first, because a
+  download does not prove it was installed on the device.
+
 ## [1.3.4] - 2026-11-24
 
 ### Fixed
@@ -231,6 +242,7 @@ First release of the Rust version of PortBridge: a WireGuard server with a web
 dashboard, per-peer routes with access rules, and public TCP and UDP port
 forwarding.
 
+[1.4.0]: https://github.com/nooblk-98/portbridge/compare/v1.3.4...v1.4.0
 [1.3.4]: https://github.com/nooblk-98/portbridge/compare/v1.3.3...v1.3.4
 [1.3.3]: https://github.com/nooblk-98/portbridge/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/nooblk-98/portbridge/compare/v1.3.1...v1.3.2
