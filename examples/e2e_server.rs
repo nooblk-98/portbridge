@@ -125,6 +125,8 @@ async fn main() {
     std::fs::create_dir_all(&data_dir).expect("create the data directory");
     let mut config = Config::for_test(data_dir.clone());
     config.admin_password = PASSWORD.to_string();
+    // The browser tests fake GitHub's answer, so the new-release check can run.
+    config.update_check = true;
     config.app_port = std::env::var("E2E_PORT")
         .ok()
         .and_then(|port| port.parse().ok())

@@ -17,6 +17,12 @@ pub mod wireguard;
 
 use std::sync::Arc;
 
+/// True for a release build, which carries its release tag in
+/// `PORTBRIDGE_VERSION`. A local development build does not.
+pub fn is_release_build() -> bool {
+    matches!(option_env!("PORTBRIDGE_VERSION"), Some(tag) if !tag.is_empty())
+}
+
 /// Release version: the `PORTBRIDGE_VERSION` build variable (a release tag)
 /// when set, otherwise the crate version.
 pub fn version() -> &'static str {

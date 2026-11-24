@@ -25,6 +25,18 @@ style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; \
 font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; \
 object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
 
+/// The only outside address the page may call: GitHub's public releases API,
+/// used to look for a newer version. Allowed only when update checks are on.
+const UPDATE_CHECK_CSP: &str = "; connect-src 'self' https://api.github.com";
+
+fn content_security_policy(update_check: bool) -> HeaderValue {
+    let mut policy = CSP.to_string();
+    if update_check {
+        policy.push_str(UPDATE_CHECK_CSP);
+    }
+    HeaderValue::from_str(&policy).expect("the policy is ASCII")
+}
+
 const REPO_URL: &str = "https://github.com/nooblk-98/portbridge";
 
 #[derive(Clone)]
@@ -43,6 +55,7 @@ pub fn templates(config: &Config) -> Environment<'static> {
     environment.set_loader(path_loader(config.template_dir.clone()));
     // Shown in the dashboard and sign-in footers.
     environment.add_global("app_version", crate::version());
+    environment.add_global("update_check", config.update_check);
     environment.add_global("wg_interface", config.wg_interface.clone());
     environment.add_global("wg_network", config.wg_network.to_string());
     // A constant URL, so it is safe to emit without HTML escaping its slashes.
@@ -120,7 +133,7 @@ async fn security_headers(State(state): State<AppState>, request: Request, next:
     let mut response = next.run(request).await;
     response.headers_mut().insert(
         header::CONTENT_SECURITY_POLICY,
-        HeaderValue::from_static(CSP),
+        content_security_policy(state.config.update_check),
     );
     if is_static {
         if response.status().is_success() || response.status() == StatusCode::NOT_MODIFIED {
@@ -661,6 +674,35 @@ mod footer_tests {
             .expect("template")
             .render(minijinja::context! {})
             .expect("render")
+    }
+
+    #[test]
+    fn the_page_may_call_github_only_when_update_checks_are_on() {
+        let off = content_security_policy(false);
+        assert!(!off.to_str().unwrap().contains("connect-src"));
+        let on = content_security_policy(true);
+        let on = on.to_str().unwrap();
+        assert!(on.starts_with(CSP));
+        assert!(on.ends_with("connect-src 'self' https://api.github.com"));
+    }
+
+    #[test]
+    fn pages_tell_the_update_check_the_version_and_whether_it_is_on() {
+        let html = render_page("index.html");
+        assert!(html.contains(&format!(
+            "<meta name=\"portbridge-version\" content=\"{}\">",
+            crate::version()
+        )));
+        assert!(html.contains("<meta name=\"portbridge-update-check\" content=\"off\">"));
+
+        let mut config = Config::for_test(std::env::temp_dir());
+        config.update_check = true;
+        let html = templates(&config)
+            .get_template("index.html")
+            .expect("template")
+            .render(minijinja::context! {})
+            .expect("render");
+        assert!(html.contains("<meta name=\"portbridge-update-check\" content=\"on\">"));
     }
 
     #[test]

@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <!-- Read by updates.js to look for a newer release. -->
+    <meta name="portbridge-version" content="{{ app_version }}">
+    <meta name="portbridge-update-check" content="{{ 'on' if update_check else 'off' }}">
     <title>WireGuard Manager</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/logo.svg') }}">
 
@@ -35,6 +38,7 @@
     <script src="{{ url_for('static', filename='vendor/dicebear-avataaars.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/chart-line.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/tones.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/updates.js') }}"></script>
     <script src="{{ url_for('static', filename='js/route-access.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

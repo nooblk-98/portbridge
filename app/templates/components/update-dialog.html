@@ -1,0 +1,84 @@
+{% from "components/ui.html" import ui %}
+{% set tab = "rounded-full px-3 py-1 text-xs font-semibold leading-normal transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-focus" %}
+<!-- What is in the new release, and the commands to upgrade by hand. -->
+<div x-show="updateOpen" x-cloak role="dialog" aria-modal="true" aria-labelledby="update-title"
+    x-ref="updateDialog" tabindex="-1"
+    @keydown.escape.window="closeUpdate()"
+    @keydown.tab="trapFocus($event, $refs.updateDialog)"
+    class="fixed inset-0 z-50 overflow-y-auto bg-black/50 px-4 py-8">
+    <div class="mx-auto w-full max-w-2xl space-y-5 rounded-2xl bg-white p-6 shadow-xl dark:bg-dark-surface dark:text-white">
+        <div class="flex items-start justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <span class="inline-flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-primary-100 text-primary-600 dark:bg-primary-500/[0.16] dark:text-primary-400">
+                    <span class="material-symbols-rounded text-[1.5rem]" aria-hidden="true">new_releases</span>
+                </span>
+                <div>
+                    <h3 id="update-title" class="text-xl font-bold leading-snug"
+                        x-text="'PortBridge v' + (updateRelease?.version || '') + ' is available'"></h3>
+                    <p class="{{ ui.hint_tight }}" x-text="updateSubtitle"></p>
+                </div>
+            </div>
+            <button type="button" class="{{ ui.icon_button }}" @click="closeUpdate()" aria-label="Close">
+                <span class="material-symbols-rounded" aria-hidden="true">close</span>
+            </button>
+        </div>
+
+        <div>
+            <h4 class="{{ ui.label }}">What's changed</h4>
+            <div x-ref="updateNotes" tabindex="0" role="region" aria-label="Release notes"
+                class="max-h-72 overflow-y-auto rounded-xl border border-ui-line bg-ui-surface-muted px-4 py-3 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-ui-focus"></div>
+            <p class="{{ ui.hint }}">
+                <a :href="updateRelease?.url" target="_blank" rel="noopener noreferrer"
+                    class="font-semibold text-ui-focus underline underline-offset-2">Open the release on GitHub</a>
+            </p>
+        </div>
+
+        <div class="border-t border-ui-line pt-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h4 class="{{ ui.label }} !mb-0">Upgrade</h4>
+                <div class="inline-flex rounded-full border border-ui-line p-0.5" role="tablist" aria-label="How PortBridge is installed">
+                    <button type="button" role="tab" id="update-tab-install" aria-controls="update-command"
+                        :aria-selected="updateTab === 'install' ? 'true' : 'false'" @click="updateTab = 'install'"
+                        class="{{ tab }}"
+                        :class="updateTab === 'install' ? 'bg-ui-accent text-white dark:text-[#082f49]' : 'text-ui-muted hover:bg-ui-surface-muted hover:text-ui-fg'">
+                        Debian / Ubuntu
+                    </button>
+                    <button type="button" role="tab" id="update-tab-docker" aria-controls="update-command"
+                        :aria-selected="updateTab === 'docker' ? 'true' : 'false'" @click="updateTab = 'docker'"
+                        class="{{ tab }}"
+                        :class="updateTab === 'docker' ? 'bg-ui-accent text-white dark:text-[#082f49]' : 'text-ui-muted hover:bg-ui-surface-muted hover:text-ui-fg'">
+                        Docker
+                    </button>
+                </div>
+            </div>
+            <div id="update-command" role="tabpanel" class="mt-3"
+                :aria-labelledby="updateTab === 'install' ? 'update-tab-install' : 'update-tab-docker'">
+                <div class="flex items-start gap-2 rounded-xl bg-slate-900 py-3 pl-4 pr-2 text-slate-100">
+                    <pre class="m-0 min-w-0 flex-1 whitespace-pre-wrap font-mono text-[0.8125rem] leading-relaxed [overflow-wrap:anywhere]"><code x-text="updateCommand"></code></pre>
+                    <button type="button" @click="copyUpdateCommand()"
+                        class="inline-flex flex-none cursor-pointer items-center gap-1 rounded-lg border border-slate-600 bg-transparent px-2.5 py-1.5 text-xs font-semibold leading-none text-slate-100 hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-300">
+                        <span class="material-symbols-rounded text-[1rem]" aria-hidden="true"
+                            x-text="updateCopied ? 'check' : 'content_copy'"></span>
+                        <span x-text="updateCopied ? 'Copied' : 'Copy'"></span>
+                    </button>
+                </div>
+                <p class="{{ ui.hint }}" x-show="updateTab === 'install'">
+                    Run this on your server. It downloads the new release and restarts PortBridge. Your settings,
+                    peers and keys are kept.
+                </p>
+                <p class="{{ ui.hint }}" x-show="updateTab === 'docker'">
+                    Run this in the folder with your Compose file. It pulls the new image and recreates the
+                    container. Keep the same project name and data volume.
+                </p>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-ui-line pt-4">
+            <button type="button" class="{{ ui.link }}" @click="ignoreUpdate()">Ignore this version</button>
+            <button type="button" class="{{ ui.button_primary }}" @click="remindLater()">
+                <span class="material-symbols-rounded text-[1.125rem]" aria-hidden="true">schedule</span>
+                Remind me later
+            </button>
+        </div>
+    </div>
+</div>

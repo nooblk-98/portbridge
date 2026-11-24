@@ -1,5 +1,5 @@
 // @ts-check
-const { test, expect } = require("@playwright/test");
+const { test, expect } = require("./fixtures");
 const { openPage, expectNoHorizontalScroll } = require("./helpers");
 
 test.describe.configure({ mode: "serial" });
