@@ -287,7 +287,7 @@ Also keep a copy of `/etc/portbridge/portbridge.env` (your settings and the pass
 ## How it works
 
 <p align="center">
-  <img src="images/architecture.png" alt="PortBridge architecture: a browser manages PortBridge on a public VPS, which configures WireGuard and iptables; peers behind NAT dial out over the tunnel and public traffic reaches their services through DNAT." width="100%">
+  <img src="images/architecture.png" alt="PortBridge system architecture: an administrator uses the dashboard on a public VPS. The single Rust binary has a web layer, managers and system services that configure WireGuard and iptables in the Linux kernel. Peers behind NAT or CGNAT dial out over an encrypted tunnel, and internet users reach services on those peers through forwarded public ports." width="100%">
 </p>
 
 - **Peers dial out.** Devices behind NAT or CGNAT connect to the server's WireGuard port and keep the tunnel alive, so they need no open inbound port.
