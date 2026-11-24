@@ -1,9 +1,12 @@
 <div align="center">
   <img src="images/banner.png" alt="PortBridge: reach devices behind NAT or CGNAT through a WireGuard server you control" width="100%">
 
-  [![Release](https://img.shields.io/github/v/release/nooblk-98/portbridge)](https://github.com/nooblk-98/portbridge/releases)
-  [![Docker image](https://img.shields.io/docker/pulls/lahiru98s/portbridge)](https://hub.docker.com/r/lahiru98s/portbridge)
-  [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+  [![Release](https://img.shields.io/github/v/release/nooblk-98/portbridge?style=flat-square&logo=github&color=0ea5e9)](https://github.com/nooblk-98/portbridge/releases)
+  [![Build](https://img.shields.io/github/actions/workflow/status/nooblk-98/portbridge/release.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=build)](https://github.com/nooblk-98/portbridge/actions)
+  [![Docker pulls](https://img.shields.io/docker/pulls/lahiru98s/portbridge?style=flat-square&logo=docker&logoColor=white&color=2496ed)](https://hub.docker.com/r/lahiru98s/portbridge)
+  [![Rust](https://img.shields.io/badge/Rust-1.85%2B-dea584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+  [![WireGuard](https://img.shields.io/badge/WireGuard-powered-88171a?style=flat-square&logo=wireguard&logoColor=white)](https://www.wireguard.com/)
+  [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 </div>
 
 PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptables port forwarding, managed from a web dashboard. Run it on a public VPS to expose services from home labs, Starlink or other connections that cannot accept inbound traffic.
