@@ -1,8 +1,8 @@
 
 [x-cloak] {
     display: none !important;
-
 }
+
 /* Colour scheme: follow the system unless theme.js pins one through the
    <meta name="color-scheme"> element. Native UI (scrollbars, form controls)
    keys off this property. */
