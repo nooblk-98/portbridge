@@ -404,9 +404,10 @@
                     <p id="peer-local-access-help" class="pb-hint pb-hint--tight">
                         <strong>On:</strong> the PortBridge server, and programs running on it such as a Docker reverse
                         proxy or <code>curl</code>, can connect to the services running on this peer and the
-                        networks it advertises. <strong>Off (the default):</strong> only other peers (through
-                        route access) and forwarded public ports can reach this peer's services. This does not
-                        change the device's profile.
+                        networks it advertises. <strong>Off (the default):</strong> the PortBridge server cannot
+                        start connections to this peer. Other peers can still reach it over the tunnel (route access
+                        applies to advertised networks), forwarded public ports still work, and the device's profile
+                        does not change.
                     </p>
                 </div>
                 <input id="peer-local-access" type="checkbox" switch role="switch" class="pb-switch"

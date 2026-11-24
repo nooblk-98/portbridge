@@ -185,7 +185,7 @@ The service sees the original client address, so its replies must return through
 
 ### Reach peers from the PortBridge server
 
-**Server access** lets the PortBridge server, and programs running on it, connect to the services running on a peer: a Docker container such as Nginx Proxy Manager, a script, or `curl`. That makes the server a reverse proxy for services that live behind NAT. It is off by default and you switch it on per peer. Point a proxy host at a peer's tunnel address (for example `http://10.10.0.2:8080`) or at a subnet the peer advertises (for example `http://192.168.1.106:8080`). Peers can only answer these connections. They cannot start new ones to the server's other services.
+**Server access** lets the PortBridge server, and programs running on it, connect to the services running on a peer: a Docker container such as Nginx Proxy Manager, a script, or `curl`. That makes the server a reverse proxy for services that live behind NAT. It is off by default and you switch it on per peer. It only controls connections that the PortBridge server itself starts: peers can already reach each other over their tunnel addresses, and forwarded public ports are not affected. Point a proxy host at a peer's tunnel address (for example `http://10.10.0.2:8080`) or at a subnet the peer advertises (for example `http://192.168.1.106:8080`). Peers can only answer these connections. They cannot start new ones to the server's other services.
 
 Each peer has a **Server access** switch on its card and in its settings, so you can allow it for the peers you proxy and leave it off for the rest. Set `ALLOW_LOCAL_TO_PEERS=1` to make it on by default for peers that have not been switched either way.
 

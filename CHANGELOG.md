@@ -5,6 +5,15 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.3.3] - 2026-11-24
+
+### Changed
+
+- The Server access explanations now say what turning it off does not affect:
+  peers can still reach each other over the tunnel, route access still governs
+  advertised networks, and forwarded public ports keep working. Only connections
+  that the PortBridge server itself starts are controlled.
+
 ## [1.3.2] - 2026-11-24
 
 ### Changed
@@ -212,6 +221,7 @@ First release of the Rust version of PortBridge: a WireGuard server with a web
 dashboard, per-peer routes with access rules, and public TCP and UDP port
 forwarding.
 
+[1.3.3]: https://github.com/nooblk-98/portbridge/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/nooblk-98/portbridge/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/nooblk-98/portbridge/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/nooblk-98/portbridge/compare/v1.2.5...v1.3.0
