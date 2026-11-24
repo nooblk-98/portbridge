@@ -4,8 +4,9 @@
 const base = require("@playwright/test");
 
 const RELEASE_API = "https://api.github.com/repos/nooblk-98/portbridge/releases/latest";
-// The e2e server reports the crate version, which is what a development build shows.
-const RUNNING_VERSION = "0.1.0";
+// The e2e server is a development build, which reports 0.0.0-dev. A release with the
+// same number is not newer, so it is what "nothing newer" looks like.
+const RUNNING_VERSION = "0.0.0";
 
 /** Release notes like the ones the release workflow publishes, plus hostile input. */
 const NOTES = [

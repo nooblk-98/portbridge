@@ -40,15 +40,15 @@ test.describe("update notification", () => {
     await openDashboard(page);
     await expect(notice(page)).toBeVisible();
     await expect(notice(page)).toContainText("PortBridge v1.5.0 is available");
-    await expect(notice(page)).toContainText("You are running v0.1.0");
+    await expect(notice(page)).toContainText("You are running v0.0.0-dev");
     await expect(notice(page).getByRole("button", { name: "What's new" })).toBeVisible();
     await expect(notice(page).getByRole("button", { name: "Remind me later" })).toBeVisible();
     await expect(notice(page).getByRole("button", { name: "Ignore this version" })).toBeVisible();
     await expectNoHorizontalScroll(page);
   });
 
-  test("does not announce an older or unreadable answer", async ({ page }) => {
-    await mockRelease(page, "0.0.9");
+  test("does not announce an answer it cannot read", async ({ page }) => {
+    await mockRelease(page, "latest");
     await openDashboard(page);
     await page.waitForTimeout(500);
     await expect(notice(page)).toBeHidden();
@@ -99,7 +99,7 @@ test.describe("update notification", () => {
       const popup = dialog(page);
       await expect(popup).toContainText("PortBridge v1.5.0 is available");
       await expect(popup).toContainText("Released November 24, 2026");
-      await expect(popup).toContainText("You are running v0.1.0");
+      await expect(popup).toContainText("You are running v0.0.0-dev");
       const notes = popup.getByRole("region", { name: "Release notes" });
       await expect(notes.getByRole("heading", { name: "Added" })).toBeVisible();
       await expect(notes.getByRole("heading", { name: "Fixed" })).toBeVisible();
