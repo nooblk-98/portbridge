@@ -283,3 +283,141 @@
         </div>
     </div>
 </div>
+
+<div x-show="modals.options" x-cloak role="dialog" aria-modal="true" aria-labelledby="peer-settings-title"
+    x-ref="peerDialog" tabindex="-1"
+    @keydown.escape.window="closePeerOptions()"
+    @keydown.tab="trapFocus($event, $refs.peerDialog)"
+    class="fixed inset-0 z-50 overflow-y-auto bg-black/50 px-4 py-8">
+    <form @submit.prevent="savePeerOptions"
+        class="pb-dialog space-y-5 rounded-2xl bg-white p-6 shadow-xl dark:bg-dark-surface dark:text-white">
+        <div class="pb-dialog__head">
+            <div>
+                <h3 id="peer-settings-title" class="text-xl font-bold">Peer settings</h3>
+                <p class="pb-hint pb-hint--tight" x-text="'Peer: ' + (forms.options.name || '')"></p>
+            </div>
+            <button type="button" class="pb-icon-button" @click="closePeerOptions()"
+                :disabled="loading.options" aria-label="Close peer settings">
+                <span class="material-symbols-rounded" aria-hidden="true">close</span>
+            </button>
+        </div>
+
+        <div>
+            <label for="peer-routes" class="pb-label">Advertised IPv4 hosts or subnets</label>
+            <textarea id="peer-routes" rows="2" x-model="forms.options.routes"
+                aria-describedby="peer-routes-help peer-route-status" spellcheck="false"
+                placeholder="192.168.50.10, 192.168.60.0/24"
+                class="pb-input w-full"></textarea>
+            <p id="peer-routes-help" class="pb-hint">
+                Separate entries with commas or spaces. A bare host address is saved as /32, and host bits are
+                cleared, so 10.0.0.5/24 is saved as 10.0.0.0/24.
+            </p>
+            <p id="peer-route-status" class="pb-error" role="status" aria-live="polite"
+                x-show="routeFormError" x-text="routeFormError"></p>
+            <ul class="pb-error-list" x-show="optionRouteErrors.length > 0">
+                <template x-for="(route, index) in optionRouteErrors" :key="'route-error-' + index">
+                    <li>
+                        <span class="pb-mono" x-text="route.raw"></span>
+                        <span aria-hidden="true"> — </span>
+                        <span x-text="route.error"></span>
+                    </li>
+                </template>
+            </ul>
+        </div>
+
+        <div class="pb-access" x-show="optionRoutes.length > 0">
+            <h4 class="pb-label">Access per route</h4>
+            <p class="pb-hint" x-show="routesAvailable">
+                Routes left on <strong>All peers</strong> are open to every connected peer. Choosing
+                <strong>Selected peers</strong> with nothing ticked blocks the route for everyone.
+            </p>
+            <p class="pb-hint" x-show="!routesAvailable" x-text="'Access controls need route data from the server. Saving changes here leaves the saved access rules untouched.'"></p>
+
+            <template x-for="(route, index) in optionRoutes" :key="'route-access-' + index">
+                <fieldset class="pb-access__route" x-show="route.ok && routesAvailable"
+                    :id="routeAnchorId(route.cidr)">
+                    <legend class="pb-access__legend pb-mono" x-text="route.cidr"></legend>
+                    <p class="pb-hint pb-hint--tight" x-show="route.abbreviated || route.hostBits">
+                        <span x-text="route.abbreviated ? 'Host entry saved with a /32 prefix' : 'Host bits cleared'"></span>:
+                        saved as <span class="pb-mono" x-text="route.cidr"></span>
+                    </p>
+
+                    <fieldset class="pb-access__mode">
+                        <legend class="pb-sr-only">Who may use <span x-text="route.cidr"></span></legend>
+                        <label class="pb-choice">
+                            <input type="radio" class="pb-choice__input"
+                                :name="'access-mode-' + index" value="all"
+                                :checked="routeMode(route.cidr) === 'all'"
+                                @change="setRouteMode(route.cidr, 'all')">
+                            <span>All peers</span>
+                        </label>
+                        <label class="pb-choice">
+                            <input type="radio" class="pb-choice__input"
+                                :name="'access-mode-' + index" value="selected"
+                                :checked="routeMode(route.cidr) === 'selected'"
+                                @change="setRouteMode(route.cidr, 'selected')">
+                            <span>Selected peers</span>
+                        </label>
+                    </fieldset>
+
+                    <div x-show="routeMode(route.cidr) === 'selected'" class="pb-access__peers">
+                        <fieldset>
+                            <legend class="pb-hint pb-hint--tight">Peers allowed to use this route</legend>
+                            <template x-for="peer in routeCandidatePeers" :key="'peer-' + route.cidr + peer.public_key">
+                                <label class="pb-choice">
+                                    <input type="checkbox" class="pb-choice__input"
+                                        :checked="routeAllows(route.cidr, peer.public_key)"
+                                        @change="toggleRoutePeer(route.cidr, peer.public_key, $event.target.checked)">
+                                    <span x-text="peer.name"></span>
+                                </label>
+                            </template>
+                            <p class="pb-hint pb-hint--tight" x-show="routeCandidatePeers.length === 0">
+                                No other peers are connected yet.
+                            </p>
+                        </fieldset>
+                        <p class="pb-error pb-error--tight" role="status" aria-live="polite"
+                            x-show="routeSelectedCount(route.cidr) === 0">
+                            No peers selected, so this route is blocked for everyone.
+                        </p>
+                    </div>
+                </fieldset>
+            </template>
+        </div>
+
+        <div class="pb-field-grid">
+            <label class="pb-block pb-field-grid__wide">
+                <input type="checkbox" class="pb-choice__input" x-model="forms.options.split_tunnel">
+                <span>Split tunnel (VPN and advertised routes only)</span>
+            </label>
+            <label class="pb-block">
+                <span class="pb-label">DNS servers (optional)</span>
+                <input x-model="forms.options.dns" class="pb-input w-full" inputmode="decimal"
+                    autocomplete="off">
+            </label>
+            <label class="pb-block">
+                <span class="pb-label">MTU (blank for automatic)</span>
+                <input type="number" min="1280" max="9000" x-model.number="forms.options.mtu" class="pb-input w-full">
+            </label>
+            <label class="pb-block">
+                <span class="pb-label">Keepalive in seconds (0 disables it)</span>
+                <input type="number" min="0" max="65535" required x-model.number="forms.options.keepalive"
+                    class="pb-input w-full">
+            </label>
+        </div>
+
+        <p class="pb-hint">
+            Saving rewrites this peer's profile. It applies only after the device imports it; export status is
+            recorded on the Routes tab.
+        </p>
+
+        <div class="pb-dialog__actions">
+            <button type="button" class="pb-button" @click="closePeerOptions()" :disabled="loading.options">
+                Cancel
+            </button>
+            <button type="submit" class="pb-button pb-button--primary" :disabled="loading.options">
+                <span x-show="loading.options" class="pb-spinner" aria-hidden="true"></span>
+                <span x-text="loading.options ? 'Saving…' : 'Save'"></span>
+            </button>
+        </div>
+    </form>
+</div>
