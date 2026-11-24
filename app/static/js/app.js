@@ -1,7 +1,20 @@
 
+// Each dashboard page has its own URL so it can be bookmarked and shared.
+const PAGES = [
+    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', path: '/' },
+    { id: 'clients', label: 'Clients', icon: 'group', path: '/clients' },
+    { id: 'routes', label: 'Routes', icon: 'route', path: '/routes' },
+    { id: 'forwarding', label: 'Forwarding', icon: 'alt_route', path: '/forwarding' }
+];
+
+function pageForPath(pathname) {
+    const clean = pathname.replace(/\/+$/, '') || '/';
+    return (PAGES.find(page => page.path === clean) || PAGES[0]).id;
+}
+
 function app() {
     return {
-        currentTab: 'dashboard',
+        currentTab: pageForPath(window.location.pathname),
         mobileMenuOpen: false,
         isDarkMode: window.PortBridgeTheme.isDark(),
         state: {},
@@ -55,19 +68,76 @@ function app() {
             type: 'success'
         },
 
-        navItems: [
-            { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-            { id: 'clients', label: 'Clients', icon: 'group' },
-            { id: 'routes', label: 'Routes', icon: 'route' },
-            { id: 'forwarding', label: 'Forwarding', icon: 'alt_route' }
-        ],
+        navItems: PAGES,
 
         initApp() {
+            // Keep the address bar, tab title and back/forward buttons in step
+            // with the visible page.
+            const showPage = tab => {
+                const page = PAGES.find(item => item.id === tab);
+                if (!page) return;
+                if (window.location.pathname.replace(/\/+$/, '') !== page.path.replace(/\/+$/, '')) {
+                    history.pushState({ tab }, '', page.path);
+                }
+                document.title = `${page.label} \u00b7 PortBridge`;
+            };
+            this.$watch('currentTab', showPage);
+            window.addEventListener('popstate', () => {
+                this.currentTab = pageForPath(window.location.pathname);
+            });
+            showPage(this.currentTab);
+            this.setupTooltips();
+
             this.loadData();
             setInterval(() => this.loadData(), 30000);
 
             // theme.js owns the stored choice and the <html> class; follow it.
             window.PortBridgeTheme.subscribe(dark => { this.isDarkMode = dark; });
+        },
+
+        /** Tooltips open on hover and focus; Escape dismisses them without moving focus. */
+        setupTooltips() {
+            document.addEventListener('keydown', event => {
+                if (event.key !== 'Escape') return;
+                document.querySelectorAll('.pb-tip:hover, .pb-tip:focus-within')
+                    .forEach(tip => { tip.dataset.dismissed = ''; });
+            });
+            const rearm = event => {
+                const tip = event.target.closest && event.target.closest('.pb-tip');
+                if (tip && !tip.contains(event.relatedTarget)) delete tip.dataset.dismissed;
+            };
+            document.addEventListener('mouseout', rearm);
+            document.addEventListener('focusout', rearm);
+        },
+
+        /** Switch a peer between split tunnel and full tunnel from its card. */
+        async toggleSplitTunnel(client, event) {
+            const input = event.target;
+            const enabled = input.checked;
+            input.disabled = true;
+            try {
+                await fetch(`/api/clients/${encodeURIComponent(client.name)}/options`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ split_tunnel: enabled }),
+                }).then(this.checkAuth);
+                this.showToast(enabled
+                    ? `Split tunnel on for ${client.name}. Re-import its profile on the device.`
+                    : `Full tunnel on for ${client.name}: all its traffic uses this server. Re-import its profile.`);
+                await this.loadData();
+            } catch (error) {
+                input.checked = !enabled;
+                const details = error instanceof Response ? await error.json().catch(() => null) : null;
+                this.showToast(details?.description || 'Could not change split tunnel', 'error');
+            } finally {
+                input.disabled = false;
+            }
+        },
+
+        /** Cartoon avatar for a peer, seeded by its public key so it survives renames. */
+        avatarFor(client) {
+            const avatars = window.PortBridgeAvatar;
+            return avatars ? avatars.dataUri(client.public_key || client.name) : '';
         },
 
         toggleTheme() {

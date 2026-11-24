@@ -696,3 +696,161 @@
 .app-footer a:focus-visible {
     text-decoration: underline;
 }
+
+/* Round on/off switch (native <input type="checkbox" switch>, styled for every browser). */
+.pb-switch {
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    flex: none;
+    width: 2.5rem;
+    height: 1.5rem;
+    margin: 0;
+    border-radius: 9999px;
+    background: #7c8ba1;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.pb-switch::before {
+    content: "";
+    position: absolute;
+    top: 0.1875rem;
+    left: 0.1875rem;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+    transition: transform 0.2s;
+}
+
+.pb-switch:checked {
+    background: #0284c7;
+}
+
+.pb-switch:checked::before {
+    transform: translateX(1rem);
+}
+
+.pb-switch:focus-visible {
+    outline: 3px solid #d35400;
+    outline-offset: 3px;
+}
+
+.pb-switch:disabled {
+    opacity: 0.6;
+    cursor: progress;
+}
+
+.dark .pb-switch {
+    background: #64748b;
+}
+
+.dark .pb-switch:checked {
+    background: #0ea5e9;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pb-switch,
+    .pb-switch::before,
+    .pb-tip__bubble {
+        transition: none;
+    }
+}
+
+/* Hover and focus tooltip: stays open while the pointer is over it and closes
+   with Escape (see setupTooltips in app.js). */
+.pb-tip {
+    position: relative;
+}
+
+.pb-tip__icon {
+    color: #94a3b8;
+}
+
+.pb-tip__bubble {
+    position: absolute;
+    z-index: 30;
+    right: 0;
+    bottom: calc(100% + 0.5rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    width: max(100%, 15rem);
+    max-width: 80vw;
+    padding: 0.75rem 0.875rem;
+    border-radius: 0.875rem;
+    background: #0f172a;
+    color: #f1f5f9;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    box-shadow: 0 10px 25px rgb(15 23 42 / 0.35);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(0.25rem);
+    transition: opacity 0.15s, transform 0.15s, visibility 0.15s;
+}
+
+/* Keeps the bubble open while the pointer crosses the gap to it. */
+.pb-tip__bubble::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 0.5rem;
+}
+
+.pb-tip:hover .pb-tip__bubble,
+.pb-tip:focus-within .pb-tip__bubble {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+}
+
+.pb-tip[data-dismissed] .pb-tip__bubble {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.dark .pb-tip__bubble {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+/* Advertised route chips on peer cards. */
+.pb-route-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.625rem;
+    border: 1px solid #a5f3fc;
+    border-radius: 0.375rem;
+    background: #ecfeff;
+    color: #0e7490;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.dark .pb-route-chip {
+    border-color: rgb(103 232 249 / 0.3);
+    background: rgb(8 145 178 / 0.2);
+    color: #67e8f9;
+}
+
+/* Generated peer avatars; offline peers are muted. */
+.pb-avatar {
+    flex: none;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.75rem;
+    object-fit: cover;
+    background: #f1f5f9;
+    transition: filter 0.2s, opacity 0.2s;
+}
+
+.pb-avatar--offline {
+    filter: grayscale(0.85);
+    opacity: 0.75;
+}

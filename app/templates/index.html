@@ -36,12 +36,13 @@
         </div>
         <nav class="flex-1 p-4 space-y-2">
             <template x-for="item in navItems" :key="item.id">
-                <button @click="currentTab = item.id; mobileMenuOpen = false"
+                <a :href="item.path" @click.prevent="currentTab = item.id; mobileMenuOpen = false"
+                    :aria-current="currentTab === item.id ? 'page' : null"
                     class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200"
                     :class="currentTab === item.id ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'">
                     <span class="material-symbols-rounded text-2xl" x-text="item.icon"></span>
                     <span x-text="item.label"></span>
-                </button>
+                </a>
             </template>
         </nav>
     </div>

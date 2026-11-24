@@ -68,6 +68,9 @@ pub fn templates(config: &Config) -> Environment<'static> {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/", get(index))
+        .route("/clients", get(clients_page))
+        .route("/routes", get(routes_page))
+        .route("/forwarding", get(forwarding_page))
         .route("/login", get(login_page))
         .route("/auth/login", post(auth_login))
         .route("/auth/logout", post(auth_logout))
@@ -192,17 +195,34 @@ fn redirect_found(location: &str) -> Response {
         .into_response()
 }
 
-async fn index(State(state): State<AppState>, headers: HeaderMap) -> Response {
+/// The dashboard shell is one template; the path picks which page it shows.
+fn app_page(state: &AppState, headers: &HeaderMap, path: &str) -> Response {
     if !state
         .auth
-        .authenticate(&headers, &state.config.admin_password)
+        .authenticate(headers, &state.config.admin_password)
     {
-        return redirect_found("/login?next=/");
+        return redirect_found(&format!("/login?next={path}"));
     }
-    match render(&state, "index.html") {
+    match render(state, "index.html") {
         Ok(response) => response,
         Err(error) => error.into_response(),
     }
+}
+
+async fn index(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    app_page(&state, &headers, "/")
+}
+
+async fn clients_page(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    app_page(&state, &headers, "/clients")
+}
+
+async fn routes_page(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    app_page(&state, &headers, "/routes")
+}
+
+async fn forwarding_page(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    app_page(&state, &headers, "/forwarding")
 }
 
 async fn login_page(State(state): State<AppState>, headers: HeaderMap) -> Response {

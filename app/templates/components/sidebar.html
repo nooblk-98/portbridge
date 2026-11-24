@@ -11,13 +11,14 @@
 
     <nav class="flex-1 px-4 space-y-2 mt-4">
         <template x-for="item in navItems" :key="item.id">
-            <button @click="currentTab = item.id"
+            <a :href="item.path" @click.prevent="currentTab = item.id"
+                :aria-current="currentTab === item.id ? 'page' : null"
                 class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group"
                 :class="currentTab === item.id ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 font-semibold shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'">
                 <span class="material-symbols-rounded text-2xl transition-transform group-hover:scale-110"
                     x-text="item.icon"></span>
                 <span x-text="item.label"></span>
-            </button>
+            </a>
         </template>
     </nav>
 

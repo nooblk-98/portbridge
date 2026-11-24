@@ -14,7 +14,10 @@ function loginApp() {
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    window.location.href = '/';
+                    // Only return to a known dashboard page, never an arbitrary URL.
+                    const next = new URLSearchParams(window.location.search).get('next');
+                    const pages = ['/', '/clients', '/routes', '/forwarding'];
+                    window.location.href = pages.includes(next) ? next : '/';
                 } else {
                     this.error = data.error || 'Login failed';
                 }
