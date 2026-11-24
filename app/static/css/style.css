@@ -844,7 +844,7 @@
     flex: none;
     width: 3rem;
     height: 3rem;
-    border-radius: 0.75rem;
+    border-radius: 50%;
     object-fit: cover;
     background: #f1f5f9;
     transition: filter 0.2s, opacity 0.2s;

@@ -1,15 +1,15 @@
 # DiceBear avatars
 
-`dicebear-thumbs.min.js` is a bundle of two MIT-licensed packages from the
+`dicebear-avataaars.min.js` is a bundle of two MIT-licensed packages from the
 [DiceBear](https://www.dicebear.com) project, built with esbuild:
 
 - `@dicebear/core` 9.4.3
-- `@dicebear/collection` 9.4.2, using only the **Thumbs** style
+- `@dicebear/collection` 9.4.2, using only the **Avataaars** style
 
-The Thumbs avatar artwork is released under
-[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) by DiceBear, so
-no attribution is required. Avatars are generated in the browser from each
-peer's public key; nothing is requested from any external service.
+The Avataaars artwork is by [Pablo Stanley](https://avataaars.com/), listed by
+DiceBear as free for personal and commercial use. Avatars are generated in the
+browser from each peer's public key; nothing is requested from any external
+service.
 
 ## DiceBear license (MIT)
 

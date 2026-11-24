@@ -49,12 +49,51 @@ jobs:
           WITH_V: true
           RELEASE_BRANCHES: main
 
+      # Pushes go straight to main, so GitHub's generated notes (which list pull
+      # requests) would be empty. Use the matching CHANGELOG.md section when there
+      # is one, otherwise list the commits since the previous release.
+      - name: Compose release notes
+        if: steps.tag.outputs.new_tag != ''
+        env:
+          NEW_TAG: ${{ steps.tag.outputs.new_tag }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force --quiet
+          version=${NEW_TAG#v}
+          prev=$(git describe --tags --abbrev=0 "${NEW_TAG}^" 2>/dev/null || true)
+          awk -v v="$version" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            index($0, "## [") == 1 { found = 0 }
+            found
+          ' CHANGELOG.md > release-notes.md
+          if ! grep -q '[^[:space:]]' release-notes.md; then
+            range=${prev:+$prev..}$NEW_TAG
+            {
+              echo "## What's changed"
+              echo
+              git log "$range" --no-merges --pretty='- %s (%h)' \
+                | sed -E 's/ *#(major|minor|patch|none)\b//g'
+            } > release-notes.md
+          fi
+          {
+            echo
+            echo "### Install or upgrade"
+            echo
+            echo '```sh'
+            echo "curl -fsSL https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/install.sh | sudo bash -s -- --upgrade"
+            echo '```'
+            if [[ -n $prev ]]; then
+              echo
+              echo "**Full changelog**: https://github.com/$GITHUB_REPOSITORY/compare/$prev...$NEW_TAG"
+            fi
+          } >> release-notes.md
+
       - name: Create draft release
         if: steps.tag.outputs.new_tag != ''
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ steps.tag.outputs.new_tag }}
-          generate_release_notes: true
+          body_path: release-notes.md
           draft: true
 
   binaries:
