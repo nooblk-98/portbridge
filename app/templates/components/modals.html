@@ -387,8 +387,9 @@
         <div class="pb-field-grid">
             <label class="pb-block pb-field-grid__wide">
                 <input type="checkbox" class="pb-choice__input" x-model="forms.options.split_tunnel">
-                <span>Split tunnel (VPN and advertised routes only)</span>
+                <span>Split tunnel: only VPN and advertised-route traffic uses the tunnel, so the device keeps its own internet connection and IP</span>
             </label>
+            <p class="pb-hint pb-field-grid__wide">Turn this off for a full tunnel, which sends all of the device's internet traffic through this server and shows the server's IP address. Re-import the profile after changing it.</p>
             <label class="pb-block">
                 <span class="pb-label">DNS servers (optional)</span>
                 <input x-model="forms.options.dns" class="pb-input w-full" inputmode="decimal"

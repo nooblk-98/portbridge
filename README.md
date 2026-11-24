@@ -133,7 +133,7 @@ The service sees the original client address, so its replies must return through
 
 ### Internet access through the VPN
 
-Peers can reach the internet through the server by default. Devices with full-tunnel profiles send their IPv4 internet traffic through it. To block this, set `ALLOW_INTERNET_EGRESS=0` in `/etc/portbridge/portbridge.env` (or the Compose service environment) and restart. Devices on split-tunnel profiles only send VPN traffic through the tunnel either way.
+Peers use split tunneling by default: only VPN and advertised-route traffic goes through the tunnel, so a device keeps its own internet connection and public IP. To send all of a device's traffic through the server, turn off **Split tunnel** in that peer's settings and re-import its profile. The server allows this by default. To block this, set `ALLOW_INTERNET_EGRESS=0` in `/etc/portbridge/portbridge.env` (or the Compose service environment) and restart.
 
 ## Configuration
 

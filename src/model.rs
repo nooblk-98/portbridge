@@ -119,7 +119,8 @@ impl Default for PeerOptions {
         Self {
             advertised_routes: Vec::new(),
             route_access: Value::Object(Map::new()),
-            split_tunnel: false,
+            // Peers keep their own internet connection unless full tunnel is chosen.
+            split_tunnel: true,
             dns: DEFAULT_DNS.to_string(),
             mtu: None,
             keepalive: DEFAULT_KEEPALIVE,
@@ -144,10 +145,12 @@ impl PeerOptions {
             .get("route_access")
             .cloned()
             .unwrap_or_else(|| Value::Object(Map::new()));
+        // Split tunnel is the default; only an explicit false sends all traffic
+        // through the server.
         let split_tunnel = extra
             .get("split_tunnel")
             .and_then(Value::as_bool)
-            .unwrap_or(false);
+            .unwrap_or(true);
         let dns = extra
             .get("dns")
             .and_then(Value::as_str)
@@ -657,6 +660,17 @@ mod tests {
 
     fn net(value: &str) -> Ipv4Net {
         value.parse().unwrap()
+    }
+
+    #[test]
+    fn peers_use_split_tunnel_unless_full_tunnel_is_chosen() {
+        assert!(PeerOptions::default().split_tunnel);
+        assert!(PeerOptions::from_extra(&Map::new()).split_tunnel);
+        let mut extra = Map::new();
+        extra.insert("split_tunnel".to_string(), Value::Bool(false));
+        assert!(!PeerOptions::from_extra(&extra).split_tunnel);
+        extra.insert("split_tunnel".to_string(), Value::Bool(true));
+        assert!(PeerOptions::from_extra(&extra).split_tunnel);
     }
 
     #[test]
