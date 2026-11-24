@@ -3,12 +3,7 @@ module.exports = {
   // Only our own sources are scanned; the vendored *.min.js libraries are not.
   content: [
     "../app/templates/**/*.html",
-    "../app/static/js/app.js",
-    "../app/static/js/login.js",
-    "../app/static/js/route-access.js",
-    "../app/static/js/tones.js",
-    "../app/static/js/updates.js",
-    "../app/static/js/theme.js",
+    "../app/static/js/**/*.js",
   ],
   // theme.js toggles the `dark` class on <html>.
   darkMode: "class",
