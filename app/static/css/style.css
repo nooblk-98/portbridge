@@ -1568,3 +1568,18 @@
         transition: none;
     }
 }
+
+/* Icon tile on the quick action cards: a fixed square so both match. */
+.pb-action-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.75rem;
+}
+
+.pb-action-icon .material-symbols-rounded {
+    line-height: 1;
+}

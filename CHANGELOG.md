@@ -5,6 +5,14 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.2.4] - 2026-11-24
+
+### Fixed
+
+- The two icon tiles on the Dashboard quick action cards (Add New Client and
+  Open Port) are now the same fixed square size on every screen. They were
+  taller than wide, and could differ depending on how the icon font loaded.
+
 ## [1.2.3] - 2026-11-24
 
 ### Added
@@ -151,6 +159,7 @@ First release of the Rust version of PortBridge: a WireGuard server with a web
 dashboard, per-peer routes with access rules, and public TCP and UDP port
 forwarding.
 
+[1.2.4]: https://github.com/nooblk-98/portbridge/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/nooblk-98/portbridge/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/nooblk-98/portbridge/compare/v1.2.0...v1.2.2
 [1.2.0]: https://github.com/nooblk-98/portbridge/compare/v1.1.0...v1.2.0
