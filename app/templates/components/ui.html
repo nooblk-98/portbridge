@@ -1,0 +1,72 @@
+{#
+  Shared Tailwind class strings and small macros, so a style that several
+  templates use is written once. Everything here is a plain utility class: there
+  is no hand-written stylesheet. Import with:
+
+    {% from "components/ui.html" import ui, tint, panel_head %}
+#}
+
+{# Hover and focus ring shared by buttons and links. #}
+{% set focus_ring = "focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ui-focus" %}
+
+{% set button_base = "inline-flex min-h-10 cursor-pointer items-center justify-center gap-[0.4rem] rounded-xl border px-4 py-[0.55rem] text-sm font-semibold leading-normal transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-[0.65] motion-reduce:transition-none " ~ focus_ring %}
+
+{% set ui = {
+    "hint": "mt-[0.35rem] text-[0.8125rem] leading-normal text-ui-muted",
+    "hint_tight": "mt-[0.15rem] text-[0.8125rem] leading-normal text-ui-muted",
+    "muted": "text-[0.8125rem] text-db-muted",
+    "label": "mb-[0.35rem] block text-sm font-semibold leading-normal text-ui-fg",
+    "mono": "font-mono text-sm leading-normal tabular-nums",
+    "error": "mt-2 text-[0.8125rem] font-semibold leading-normal text-ui-danger",
+    "error_tight": "mt-[0.4rem] text-[0.8125rem] font-semibold leading-normal text-ui-danger",
+    "error_list": "mt-[0.4rem] pl-[1.1rem] text-[0.8125rem] leading-normal text-ui-danger [&>li+li]:mt-[0.2rem]",
+
+    "button": button_base ~ " border-ui-line bg-ui-surface text-ui-fg hover:enabled:bg-ui-surface-muted",
+    "button_primary": button_base ~ " border-ui-accent bg-ui-accent text-white hover:enabled:border-ui-accent-hover hover:enabled:bg-ui-accent-hover dark:text-[#082f49]",
+    "icon_button": "inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-transparent bg-transparent text-ui-muted hover:enabled:bg-ui-surface-muted hover:enabled:text-ui-fg " ~ focus_ring,
+    "link": "inline-flex cursor-pointer items-center gap-1 rounded-lg border-0 bg-transparent px-[0.35rem] py-1 text-[0.8125rem] font-semibold leading-normal text-ui-focus underline underline-offset-2 hover:bg-ui-surface-muted motion-reduce:transition-none " ~ focus_ring,
+    "input": "block rounded-xl border border-ui-line bg-ui-surface px-3 py-[0.55rem] text-[0.9375rem] leading-normal text-ui-fg placeholder:text-ui-muted placeholder:opacity-[0.85] focus:border-ui-focus focus:outline focus:outline-[3px] focus:outline-offset-1 focus:outline-ui-focus",
+    "choice": "inline-flex cursor-pointer items-center gap-2 py-[0.15rem] text-sm leading-normal text-ui-fg",
+    "choice_input": "m-0 h-[1.05rem] w-[1.05rem] flex-shrink-0 accent-ui-focus " ~ focus_ring,
+    "switch": "relative m-0 h-6 w-10 flex-none cursor-pointer appearance-none rounded-full bg-[#7c8ba1] bg-none transition-colors duration-200 before:absolute before:left-[0.1875rem] before:top-[0.1875rem] before:h-[1.125rem] before:w-[1.125rem] before:rounded-full before:bg-white before:shadow-[0_1px_2px_rgb(0_0_0/0.35)] before:transition-transform before:duration-200 before:content-[''] checked:bg-primary-600 checked:bg-none checked:before:translate-x-4 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-[3px] focus-visible:outline-[#d35400] disabled:cursor-progress disabled:opacity-60 dark:bg-slate-500 dark:checked:bg-primary-500 motion-reduce:transition-none motion-reduce:before:transition-none",
+    "spinner": "h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:[animation-duration:2.4s]",
+
+    "card": "overflow-hidden rounded-2xl border border-ui-line bg-ui-surface",
+    "card_title": "m-0 text-[1.0625rem] font-bold leading-normal text-ui-fg",
+    "empty": "px-5 pb-9 pt-8 text-center",
+    "empty_icon": "text-[2rem] text-ui-muted",
+    "empty_title": "mt-2 font-semibold text-ui-fg",
+
+    "pill": "inline-flex items-center gap-[0.3rem] rounded-full border px-[0.6rem] py-[0.2rem] text-xs font-semibold leading-normal",
+    "route_chip": "inline-flex items-center rounded-md border border-cyan-200 bg-cyan-50 px-2.5 py-1 font-mono text-xs font-medium leading-normal text-cyan-700 dark:border-cyan-300/30 dark:bg-cyan-600/20 dark:text-cyan-300",
+
+    "panel": "flex min-w-0 flex-col rounded-2xl border border-db-panel-line bg-db-panel p-6 text-db-fg shadow-sm",
+    "panel_head": "mb-5 flex items-center gap-3",
+    "panel_icon": "inline-flex h-9 w-9 items-center justify-center rounded-xl",
+    "panel_title": "m-0 whitespace-nowrap text-[0.9375rem] font-semibold leading-normal text-db-fg",
+    "panel_hint": "ml-auto text-right text-xs leading-normal text-db-muted",
+    "foot": "mt-3.5 text-xs leading-normal text-db-muted",
+    "ring_track": "fill-none stroke-db-track stroke-[10]",
+    "ring_value": "fill-none stroke-current stroke-[10] [stroke-linecap:round] [transition:stroke-dasharray_0.6s_ease,stroke_0.3s] motion-reduce:transition-none",
+    "meter": "mt-1.5 h-1.5 overflow-hidden rounded-full bg-db-track",
+    "meter_bar": "block h-full rounded-full [transition:width_0.6s_ease] motion-reduce:transition-none",
+    "swatch": "mr-1.5 inline-block h-2.5 w-2.5 rounded-full",
+} %}
+
+{# The tinted square behind a panel's icon. #}
+{% set tints = {
+    "sky": "bg-sky-100 text-sky-600 dark:bg-sky-500/[0.16] dark:text-sky-400",
+    "emerald": "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/[0.16] dark:text-emerald-400",
+    "violet": "bg-violet-100 text-violet-600 dark:bg-violet-600/20 dark:text-violet-400",
+    "amber": "bg-amber-100 text-amber-600 dark:bg-amber-500/[0.16] dark:text-amber-400",
+    "rose": "bg-rose-100 text-rose-600 dark:bg-rose-500/[0.16] dark:text-rose-400",
+} %}
+
+{# A dashboard panel's header: icon tile, title and optional extra content. #}
+{% macro panel_head(id, title, icon, tint, extra="") %}
+<header class="{{ ui.panel_head }}">
+    <span class="{{ ui.panel_icon }} {{ tints[tint] }}"><span class="material-symbols-rounded text-[1.375rem]">{{ icon }}</span></span>
+    <h3 id="{{ id }}" class="{{ ui.panel_title }}">{{ title }}</h3>
+    {{ extra|safe }}
+</header>
+{% endmacro %}

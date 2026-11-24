@@ -6,6 +6,7 @@ module.exports = {
     "../app/static/js/app.js",
     "../app/static/js/login.js",
     "../app/static/js/route-access.js",
+    "../app/static/js/tones.js",
     "../app/static/js/theme.js",
   ],
   // theme.js toggles the `dark` class on <html>.
@@ -31,6 +32,35 @@ module.exports = {
           surface: "#1e293b",
           border: "#334155",
         },
+        // Semantic colours that switch with the theme. The values are CSS
+        // variables defined in src/tailwind.css, so one class works in both.
+        ui: {
+          surface: "var(--ui-surface)",
+          "surface-muted": "var(--ui-surface-muted)",
+          line: "var(--ui-line)",
+          fg: "var(--ui-fg)",
+          muted: "var(--ui-muted)",
+          focus: "var(--ui-focus)",
+          accent: "var(--ui-accent)",
+          "accent-hover": "var(--ui-accent-hover)",
+          danger: "var(--ui-danger)",
+        },
+        // The same idea for the dashboard panels.
+        db: {
+          panel: "var(--db-panel)",
+          "panel-line": "var(--db-panel-line)",
+          line: "var(--db-line)",
+          fg: "var(--db-fg)",
+          muted: "var(--db-muted)",
+          track: "var(--db-track)",
+          surface: "var(--db-surface)",
+          accent: "var(--db-accent)",
+          ok: "#10b981",
+          warn: "#f59e0b",
+          crit: "#ef4444",
+          down: "#0ea5e9",
+          up: "#6366f1",
+        },
       },
       fontFamily: {
         sans: ["Plus Jakarta Sans", "sans-serif"],
@@ -52,5 +82,9 @@ module.exports = {
       },
     },
   },
-  plugins: [require("@tailwindcss/forms"), require("@tailwindcss/typography")],
+  plugins: [
+    require("@tailwindcss/forms"),
+    require("@tailwindcss/typography"),
+    require("@tailwindcss/container-queries"),
+  ],
 };

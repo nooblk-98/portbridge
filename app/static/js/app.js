@@ -177,11 +177,11 @@ function app() {
         setupTooltips() {
             document.addEventListener('keydown', event => {
                 if (event.key !== 'Escape') return;
-                document.querySelectorAll('.pb-tip:hover, .pb-tip:focus-within')
+                document.querySelectorAll('[data-tip]:hover, [data-tip]:focus-within')
                     .forEach(tip => { tip.dataset.dismissed = ''; });
             });
             const rearm = event => {
-                const tip = event.target.closest && event.target.closest('.pb-tip');
+                const tip = event.target.closest && event.target.closest('[data-tip]');
                 if (tip && !tip.contains(event.relatedTarget)) delete tip.dataset.dismissed;
             };
             document.addEventListener('mouseout', rearm);
@@ -265,10 +265,12 @@ function app() {
             return `${((clamped / 100) * circumference).toFixed(1)} ${circumference.toFixed(1)}`;
         },
 
+        /** Colour class for a gauge: green, then amber at `warnAt`, then red at `critAt`. */
         toneFor(percent, warnAt = 70, critAt = 90) {
-            if (percent >= critAt) return 'pb-tone-crit';
-            if (percent >= warnAt) return 'pb-tone-warn';
-            return 'pb-tone-ok';
+            const { TONE } = window.PortBridgeTones;
+            if (percent >= critAt) return TONE.crit;
+            if (percent >= warnAt) return TONE.warn;
+            return TONE.ok;
         },
 
         get peerRows() {
@@ -284,9 +286,10 @@ function app() {
             return this.peersTotal ? (this.peersOnline / this.peersTotal) * 100 : 0;
         },
         get peersTone() {
-            if (this.peersTotal === 0) return 'pb-tone-warn';
-            if (this.peersOnline === 0) return 'pb-tone-crit';
-            return this.peersOnline === this.peersTotal ? 'pb-tone-ok' : 'pb-tone-warn';
+            const { TONE } = window.PortBridgeTones;
+            if (this.peersTotal === 0) return TONE.warn;
+            if (this.peersOnline === 0) return TONE.crit;
+            return this.peersOnline === this.peersTotal ? TONE.ok : TONE.warn;
         },
 
         get trafficTotal() {
@@ -307,6 +310,10 @@ function app() {
 
         get healthStatus() { return this.stats?.health?.status || 'ok'; },
         get healthChecks() { return this.stats?.health?.checks || []; },
+        get healthBadgeClass() { return window.PortBridgeTones.HEALTH_BADGE[this.healthStatus] || ''; },
+        healthIconClass(status) { return window.PortBridgeTones.HEALTH_ICON[status] || ''; },
+        /** Classes for a status pill; `tone` is ok, warn, danger or muted. */
+        pillClass(tone) { return window.PortBridgeTones.PILL[tone] || window.PortBridgeTones.PILL.muted; },
         get healthLabel() {
             return { ok: 'Healthy', warn: 'Attention', fail: 'Problem' }[this.healthStatus] || '';
         },

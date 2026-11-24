@@ -1,3 +1,8 @@
+{% from "components/ui.html" import ui %}
+{% set setting = "flex items-center justify-between gap-5 rounded-[0.85rem] border border-ui-line bg-ui-surface-muted px-4 py-[0.85rem]" %}
+{% set setting_label = "mb-[0.15rem] block text-sm font-semibold leading-normal text-ui-fg" %}
+{# Hints inside a dialog section sit a little lower than elsewhere. #}
+{% set section_hint = "mt-[0.6rem] text-[0.8125rem] leading-normal text-ui-muted" %}
 <!-- Add Client Modal -->
 <div x-show="modals.client" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog"
     aria-modal="true" x-cloak>
@@ -291,34 +296,34 @@
     @keydown.tab="trapFocus($event, $refs.peerDialog)"
     class="fixed inset-0 z-50 overflow-y-auto bg-black/50 px-4 py-8">
     <form @submit.prevent="savePeerOptions"
-        class="pb-dialog space-y-5 rounded-2xl bg-white p-6 shadow-xl dark:bg-dark-surface dark:text-white">
-        <div class="pb-dialog__head">
+        class="mx-auto w-full max-w-2xl space-y-5 rounded-2xl bg-white p-6 shadow-xl dark:bg-dark-surface dark:text-white">
+        <div class="flex items-start justify-between gap-4">
             <div>
                 <h3 id="peer-settings-title" class="text-xl font-bold">Peer settings</h3>
-                <p class="pb-hint pb-hint--tight" x-text="'Peer: ' + (forms.options.name || '')"></p>
+                <p class="{{ ui.hint_tight }}" x-text="'Peer: ' + (forms.options.name || '')"></p>
             </div>
-            <button type="button" class="pb-icon-button" @click="closePeerOptions()"
+            <button type="button" class="{{ ui.icon_button }}" @click="closePeerOptions()"
                 :disabled="loading.options" aria-label="Close peer settings">
                 <span class="material-symbols-rounded" aria-hidden="true">close</span>
             </button>
         </div>
 
         <div>
-            <label for="peer-routes" class="pb-label">Advertised IPv4 hosts or subnets</label>
+            <label for="peer-routes" class="{{ ui.label }}">Advertised IPv4 hosts or subnets</label>
             <textarea id="peer-routes" rows="2" x-model="forms.options.routes"
                 aria-describedby="peer-routes-help peer-route-status" spellcheck="false"
                 placeholder="192.168.50.10, 192.168.60.0/24"
-                class="pb-input w-full"></textarea>
-            <p id="peer-routes-help" class="pb-hint">
+                class="{{ ui.input }} w-full"></textarea>
+            <p id="peer-routes-help" class="{{ ui.hint }}">
                 Separate entries with commas or spaces. A bare host address is saved as /32, and host bits are
                 cleared, so 10.0.0.5/24 is saved as 10.0.0.0/24.
             </p>
-            <p id="peer-route-status" class="pb-error" role="status" aria-live="polite"
+            <p id="peer-route-status" class="{{ ui.error }}" role="status" aria-live="polite"
                 x-show="routeFormError" x-text="routeFormError"></p>
-            <ul class="pb-error-list" x-show="optionRouteErrors.length > 0">
+            <ul class="{{ ui.error_list }}" x-show="optionRouteErrors.length > 0">
                 <template x-for="(route, index) in optionRouteErrors" :key="'route-error-' + index">
                     <li>
-                        <span class="pb-mono" x-text="route.raw"></span>
+                        <span class="{{ ui.mono }}" x-text="route.raw"></span>
                         <span aria-hidden="true"> — </span>
                         <span x-text="route.error"></span>
                     </li>
@@ -326,34 +331,34 @@
             </ul>
         </div>
 
-        <div class="pb-access" x-show="optionRoutes.length > 0">
-            <h4 class="pb-label">Access per route</h4>
-            <p class="pb-hint" x-show="routesAvailable">
+        <div class="border-t border-ui-line pt-4" x-show="optionRoutes.length > 0">
+            <h4 class="{{ ui.label }}">Access per route</h4>
+            <p class="{{ ui.hint }}" x-show="routesAvailable">
                 Routes left on <strong>All peers</strong> are open to every connected peer. Choosing
                 <strong>Selected peers</strong> with nothing ticked blocks the route for everyone.
             </p>
-            <p class="pb-hint" x-show="!routesAvailable" x-text="'Access controls need route data from the server. Saving changes here leaves the saved access rules untouched.'"></p>
+            <p class="{{ ui.hint }}" x-show="!routesAvailable" x-text="'Access controls need route data from the server. Saving changes here leaves the saved access rules untouched.'"></p>
 
             <template x-for="(route, index) in optionRoutes" :key="'route-access-' + index">
-                <fieldset class="pb-access__route" x-show="route.ok && routesAvailable"
+                <fieldset class="mx-0 mb-0 mt-3 min-w-0 rounded-[0.85rem] border border-ui-line px-4 pb-[0.9rem] pt-[0.8rem]" x-show="route.ok && routesAvailable"
                     :id="routeAnchorId(route.cidr)">
-                    <legend class="pb-access__legend pb-mono" x-text="route.cidr"></legend>
-                    <p class="pb-hint pb-hint--tight" x-show="route.abbreviated || route.hostBits">
+                    <legend class="{{ ui.mono }} px-[0.35rem] font-bold text-ui-fg" x-text="route.cidr"></legend>
+                    <p class="{{ ui.hint_tight }}" x-show="route.abbreviated || route.hostBits">
                         <span x-text="route.abbreviated ? 'Host entry saved with a /32 prefix' : 'Host bits cleared'"></span>:
-                        saved as <span class="pb-mono" x-text="route.cidr"></span>
+                        saved as <span class="{{ ui.mono }}" x-text="route.cidr"></span>
                     </p>
 
-                    <fieldset class="pb-access__mode">
-                        <legend class="pb-sr-only">Who may use <span x-text="route.cidr"></span></legend>
-                        <label class="pb-choice">
-                            <input type="radio" class="pb-choice__input"
+                    <fieldset class="mt-2 flex flex-wrap gap-x-5 gap-y-[0.35rem] border-0 p-0">
+                        <legend class="sr-only">Who may use <span x-text="route.cidr"></span></legend>
+                        <label class="{{ ui.choice }}">
+                            <input type="radio" class="{{ ui.choice_input }}"
                                 :name="'access-mode-' + index" value="all"
                                 :checked="routeMode(route.cidr) === 'all'"
                                 @change="setRouteMode(route.cidr, 'all')">
                             <span>All peers</span>
                         </label>
-                        <label class="pb-choice">
-                            <input type="radio" class="pb-choice__input"
+                        <label class="{{ ui.choice }}">
+                            <input type="radio" class="{{ ui.choice_input }}"
                                 :name="'access-mode-' + index" value="selected"
                                 :checked="routeMode(route.cidr) === 'selected'"
                                 @change="setRouteMode(route.cidr, 'selected')">
@@ -361,22 +366,22 @@
                         </label>
                     </fieldset>
 
-                    <div x-show="routeMode(route.cidr) === 'selected'" class="pb-access__peers">
-                        <fieldset>
-                            <legend class="pb-hint pb-hint--tight">Peers allowed to use this route</legend>
+                    <div x-show="routeMode(route.cidr) === 'selected'" class="mt-[0.6rem] border-t border-dashed border-ui-line pt-[0.6rem]">
+                        <fieldset class="m-0 flex flex-col gap-[0.35rem] border-0 p-0">
+                            <legend class="{{ ui.hint_tight }}">Peers allowed to use this route</legend>
                             <template x-for="peer in routeCandidatePeers" :key="'peer-' + route.cidr + peer.public_key">
-                                <label class="pb-choice">
-                                    <input type="checkbox" class="pb-choice__input"
+                                <label class="{{ ui.choice }}">
+                                    <input type="checkbox" class="{{ ui.choice_input }}"
                                         :checked="routeAllows(route.cidr, peer.public_key)"
                                         @change="toggleRoutePeer(route.cidr, peer.public_key, $event.target.checked)">
                                     <span x-text="peer.name"></span>
                                 </label>
                             </template>
-                            <p class="pb-hint pb-hint--tight" x-show="routeCandidatePeers.length === 0">
+                            <p class="{{ ui.hint_tight }}" x-show="routeCandidatePeers.length === 0">
                                 No other peers are connected yet.
                             </p>
                         </fieldset>
-                        <p class="pb-error pb-error--tight" role="status" aria-live="polite"
+                        <p class="{{ ui.error_tight }}" role="status" aria-live="polite"
                             x-show="routeSelectedCount(route.cidr) === 0">
                             No peers selected, so this route is blocked for everyone.
                         </p>
@@ -385,24 +390,24 @@
             </template>
         </div>
 
-        <div class="pb-section">
-            <div class="pb-setting">
-                <div class="pb-setting__text">
-                    <label for="peer-split-tunnel" class="pb-label">Split tunnel</label>
-                    <p id="peer-split-help" class="pb-hint pb-hint--tight">
+        <div class="border-t border-ui-line pt-4">
+            <div class="{{ setting }}">
+                <div class="min-w-0">
+                    <label for="peer-split-tunnel" class="{{ setting_label }}">Split tunnel</label>
+                    <p id="peer-split-help" class="{{ section_hint }}">
                         <strong>On:</strong> only VPN and advertised-route traffic uses the tunnel, so the device keeps
                         its own internet connection and IP address.
                         <strong>Off (full tunnel):</strong> all of its internet traffic goes through the PortBridge hosted
                         server and shows that server's IP address.
                     </p>
                 </div>
-                <input id="peer-split-tunnel" type="checkbox" switch role="switch" class="pb-switch"
+                <input id="peer-split-tunnel" type="checkbox" switch role="switch" class="{{ ui.switch }}"
                     x-model="forms.options.split_tunnel" aria-describedby="peer-split-help">
             </div>
-            <div class="pb-setting">
-                <div class="pb-setting__text">
-                    <label for="peer-local-access" class="pb-label">Server access</label>
-                    <p id="peer-local-access-help" class="pb-hint pb-hint--tight">
+            <div class="{{ setting }} mt-3">
+                <div class="min-w-0">
+                    <label for="peer-local-access" class="{{ setting_label }}">Server access</label>
+                    <p id="peer-local-access-help" class="{{ section_hint }}">
                         <strong>On:</strong> Docker containers and other traffic forwarded through the PortBridge server,
                         such as a reverse proxy, can connect to the services running on this peer and the networks it
                         advertises. <strong>Off (the default):</strong> they cannot. Other peers can still reach it over
@@ -411,46 +416,46 @@
                         restricted by this switch. The device's profile does not change.
                     </p>
                 </div>
-                <input id="peer-local-access" type="checkbox" switch role="switch" class="pb-switch"
+                <input id="peer-local-access" type="checkbox" switch role="switch" class="{{ ui.switch }}"
                     x-model="forms.options.local_access" aria-describedby="peer-local-access-help">
             </div>
         </div>
 
-        <div class="pb-section">
-            <div class="pb-field-grid pb-field-grid--three">
-                <label class="pb-block">
-                    <span class="pb-label">DNS servers</span>
-                    <input x-model="forms.options.dns" class="pb-input w-full" inputmode="decimal"
+        <div class="border-t border-ui-line pt-4">
+            <div class="grid grid-cols-1 gap-[0.9rem] sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                <label class="block">
+                    <span class="{{ ui.label }}">DNS servers</span>
+                    <input x-model="forms.options.dns" class="{{ ui.input }} w-full" inputmode="decimal"
                         autocomplete="off" placeholder="Default" aria-describedby="peer-network-help">
                 </label>
-                <label class="pb-block">
-                    <span class="pb-label">MTU</span>
+                <label class="block">
+                    <span class="{{ ui.label }}">MTU</span>
                     <input type="number" min="1280" max="9000" x-model.number="forms.options.mtu"
-                        class="pb-input w-full" placeholder="Auto" aria-describedby="peer-network-help">
+                        class="{{ ui.input }} w-full" placeholder="Auto" aria-describedby="peer-network-help">
                 </label>
-                <label class="pb-block">
-                    <span class="pb-label">Keepalive (seconds)</span>
+                <label class="block">
+                    <span class="{{ ui.label }}">Keepalive (seconds)</span>
                     <input type="number" min="0" max="65535" required x-model.number="forms.options.keepalive"
-                        class="pb-input w-full" aria-describedby="peer-network-help">
+                        class="{{ ui.input }} w-full" aria-describedby="peer-network-help">
                 </label>
             </div>
-            <p id="peer-network-help" class="pb-hint">
+            <p id="peer-network-help" class="{{ section_hint }}">
                 DNS and MTU are optional: leave them blank to use the defaults. A keepalive of 25 seconds keeps the
                 tunnel open behind NAT, and 0 turns it off.
             </p>
         </div>
 
-        <p class="pb-hint">
+        <p class="{{ section_hint }}">
             Saving rewrites this peer's profile. It applies only after the device imports it; export status is
             recorded on the Routes tab.
         </p>
 
-        <div class="pb-dialog__actions">
-            <button type="button" class="pb-button" @click="closePeerOptions()" :disabled="loading.options">
+        <div class="flex justify-end gap-3 pt-1">
+            <button type="button" class="{{ ui.button }}" @click="closePeerOptions()" :disabled="loading.options">
                 Cancel
             </button>
-            <button type="submit" class="pb-button pb-button--primary" :disabled="loading.options">
-                <span x-show="loading.options" class="pb-spinner" aria-hidden="true"></span>
+            <button type="submit" class="{{ ui.button_primary }}" :disabled="loading.options">
+                <span x-show="loading.options" class="{{ ui.spinner }}" aria-hidden="true"></span>
                 <span x-text="loading.options ? 'Saving…' : 'Save'"></span>
             </button>
         </div>

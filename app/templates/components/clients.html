@@ -1,3 +1,6 @@
+{% from "components/ui.html" import ui %}
+{# Hover and focus tooltip: stays open while the pointer is over it and closes with Escape (see setupTooltips in app.js). #}
+{% set tip_bubble = "invisible absolute bottom-[calc(100%+0.5rem)] right-0 z-30 flex w-[max(100%,15rem)] max-w-[80vw] translate-y-1 flex-col gap-1.5 rounded-[0.875rem] bg-slate-900 px-3.5 py-3 text-xs leading-[1.45] text-slate-100 opacity-0 shadow-[0_10px_25px_rgb(15_23_42/0.35)] transition-[opacity,transform,visibility] duration-150 after:absolute after:inset-x-0 after:top-full after:h-2 after:content-[''] group-focus-within/tip:visible group-focus-within/tip:translate-y-0 group-focus-within/tip:opacity-100 group-hover/tip:visible group-hover/tip:translate-y-0 group-hover/tip:opacity-100 group-data-[dismissed]/tip:!invisible group-data-[dismissed]/tip:!opacity-0 dark:bg-slate-200 dark:text-slate-900 motion-reduce:transition-none" %}
 <div x-show="currentTab === 'clients'" x-cloak x-transition:enter="transition ease-out duration-300"
     x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
     <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -12,8 +15,8 @@
         </button>
     </header>
 
-    <p x-show="!clientsReady && !clientsError" role="status" class="pb-hint">Loading clients…</p>
-    <p x-show="clientsError" role="alert" class="pb-hint" x-text="clientsError"></p>
+    <p x-show="!clientsReady && !clientsError" role="status" class="{{ ui.hint }}">Loading clients…</p>
+    <p x-show="clientsError" role="alert" class="{{ ui.hint }}" x-text="clientsError"></p>
 
     <!-- Search -->
     <div class="mb-6">
@@ -29,12 +32,13 @@
     <!-- Clients Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         <template x-for="client in filteredClients" :key="client.public_key">
-            <div
+            <div data-testid="client-card"
                 class="bg-white dark:bg-dark-surface rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-dark-border hover:shadow-md transition-shadow group">
                 <div class="flex items-start justify-between mb-4">
                     <div class="flex items-center gap-3">
                         <img x-show="avatarFor(client)" :src="avatarFor(client)" alt="" width="48" height="48"
-                            class="pb-avatar" :class="client.online ? '' : 'pb-avatar--offline'">
+                            class="h-12 w-12 flex-none rounded-full bg-slate-100 object-cover transition-[filter,opacity] duration-200"
+                            :class="client.online ? '' : 'opacity-75 grayscale-[0.85]'">
                         <div x-show="!avatarFor(client)"
                             class="w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold uppercase"
                             :class="client.online ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'">
@@ -52,6 +56,7 @@
                     </div>
                     <div class="relative" x-data="{ open: false }">
                         <button @click="open = !open" @click.away="open = false"
+                            :aria-label="'Actions for ' + client.name" aria-haspopup="menu" :aria-expanded="open"
                             class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
                             <span class="material-symbols-rounded">more_vert</span>
                         </button>
@@ -99,36 +104,36 @@
                     </div>
                 </div>
 
-                <div class="pb-tip mt-3 flex items-center justify-between text-sm">
+                <div data-tip class="group/tip relative mt-3 flex items-center justify-between text-sm">
                     <label :for="'split-' + client.public_key"
                         class="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400 cursor-pointer">
                         <span>Split tunnel</span>
-                        <span class="material-symbols-rounded text-base pb-tip__icon" aria-hidden="true">info</span>
+                        <span class="material-symbols-rounded text-base text-slate-400" aria-hidden="true">info</span>
                     </label>
-                    <input type="checkbox" switch role="switch" class="pb-switch"
+                    <input type="checkbox" switch role="switch" class="{{ ui.switch }}"
                         :id="'split-' + client.public_key"
                         :checked="!client.options || client.options.split_tunnel !== false"
                         :aria-describedby="'split-tip-' + client.public_key"
                         @change="toggleSplitTunnel(client, $event)">
-                    <span role="tooltip" class="pb-tip__bubble" :id="'split-tip-' + client.public_key">
+                    <span role="tooltip" class="{{ tip_bubble }}" :id="'split-tip-' + client.public_key">
                         <strong>Split tunnel</strong>
                         <span>On: only VPN and advertised-route traffic uses the tunnel, so this device keeps its own internet connection and IP address.</span>
                         <span>Off (full tunnel): all of its internet traffic goes through the PortBridge hosted server and shows that server's IP. Re-import the profile after changing it.</span>
                     </span>
                 </div>
 
-                <div class="pb-tip mt-3 flex items-center justify-between text-sm">
+                <div data-tip class="group/tip relative mt-3 flex items-center justify-between text-sm">
                     <label :for="'local-' + client.public_key"
                         class="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400 cursor-pointer">
                         <span>Server access</span>
-                        <span class="material-symbols-rounded text-base pb-tip__icon" aria-hidden="true">info</span>
+                        <span class="material-symbols-rounded text-base text-slate-400" aria-hidden="true">info</span>
                     </label>
-                    <input type="checkbox" switch role="switch" class="pb-switch"
+                    <input type="checkbox" switch role="switch" class="{{ ui.switch }}"
                         :id="'local-' + client.public_key"
                         :checked="!!client.options && client.options.local_access === true"
                         :aria-describedby="'local-tip-' + client.public_key"
                         @change="toggleLocalAccess(client, $event)">
-                    <span role="tooltip" class="pb-tip__bubble" :id="'local-tip-' + client.public_key">
+                    <span role="tooltip" class="{{ tip_bubble }}" :id="'local-tip-' + client.public_key">
                         <strong>Server access</strong>
                         <span>On: Docker containers and other traffic forwarded through the PortBridge server, such as a reverse proxy, can connect to the services running on this peer and the networks it advertises.</span>
                         <span>Off (the default): they cannot. Other peers and forwarded public ports are not affected. Programs run directly on the server (a shell, curl, ssh) are not restricted by this switch. No profile change is needed.</span>
@@ -139,7 +144,7 @@
                     <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Advertised Routes</div>
                     <div class="flex flex-wrap gap-2">
                         <template x-for="route in (client.options && client.options.advertised_routes) || []" :key="route">
-                            <span class="pb-route-chip" x-text="route"></span>
+                            <span class="{{ ui.route_chip }}" x-text="route"></span>
                         </template>
                         <span x-show="!client.options || !client.options.advertised_routes || client.options.advertised_routes.length === 0"
                             class="text-xs text-slate-400 italic">No routes</span>
