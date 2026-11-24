@@ -24,6 +24,7 @@ function app() {
         stats: null,
         history: null,
         historyRange: '1h',
+        historyRequestId: 0,
         historyRanges: [
             { id: '1h', label: '1 h' },
             { id: '24h', label: '24 h' },
@@ -32,6 +33,7 @@ function app() {
         statsTick: 0,
         clients: [],
         forwardings: [],
+        forwardingError: '',
         routes: [],
         routeRows: [],
         restrictedRouteCount: 0,
@@ -69,6 +71,7 @@ function app() {
         pendingDelete: { type: null, name: null, port: null, proto: null },
 
         loading: {
+            logout: false,
             createClient: false,
             createFwd: false,
             options: false,
@@ -353,9 +356,12 @@ function app() {
         },
 
         async loadHistory() {
+            const requestId = ++this.historyRequestId;
             try {
                 const response = await fetch(`/api/stats/history?range=${encodeURIComponent(this.historyRange)}`).then(this.checkAuth);
-                this.history = await response.json();
+                const history = await response.json();
+                if (requestId !== this.historyRequestId) return;
+                this.history = history;
                 this.renderTrafficChart();
             } catch (error) {
                 // Keep the previous chart.
@@ -444,11 +450,16 @@ function app() {
         },
 
         async logout() {
+            if (this.loading.logout) return;
+            this.loading.logout = true;
             try {
-                await fetch('/auth/logout', { method: 'POST' });
+                const response = await fetch('/auth/logout', { method: 'POST' });
+                if (!response.ok && response.status !== 401) throw response;
                 window.location.href = '/login';
-            } catch (e) {
-                window.location.reload();
+            } catch (error) {
+                this.showToast('Could not sign out. Please try again.', 'error');
+            } finally {
+                this.loading.logout = false;
             }
         },
 
@@ -463,10 +474,10 @@ function app() {
 
         async loadData() {
             try {
-                const [stateRes, clientsRes, fwdRes] = await Promise.all([
+                const forwarding = this.loadForwardings();
+                const [stateRes, clientsRes] = await Promise.all([
                     fetch('/api/state').then(this.checkAuth),
-                    fetch('/api/clients').then(this.checkAuth),
-                    fetch('/api/forwardings').then(this.checkAuth)
+                    fetch('/api/clients').then(this.checkAuth)
                 ]);
 
                 this.state = await stateRes.json();
@@ -479,11 +490,22 @@ function app() {
                     : [];
                 this.splitTunnelProfilesAvailable = Array.isArray(clientsData.split_tunnel_profiles);
                 this.buildRouteView();
-                const fwdData = await fwdRes.json();
-                this.forwardings = fwdData.items;
+                await forwarding;
             } catch (err) {
                 if (err.status === 401) return;
                 console.error('Failed to load data', err);
+            }
+        },
+
+        async loadForwardings() {
+            try {
+                const response = await fetch('/api/forwardings').then(this.checkAuth);
+                this.forwardings = (await response.json()).items;
+                this.forwardingError = '';
+            } catch (error) {
+                if (error.status === 401) return;
+                const details = error instanceof Response ? await error.json().catch(() => null) : null;
+                this.forwardingError = details?.description || 'Could not load forwarding rules.';
             }
         },
 
