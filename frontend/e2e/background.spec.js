@@ -38,7 +38,7 @@ test.describe("falling stars background", () => {
       };
     });
     expect(layer).toEqual({ position: "fixed", behind: true, events: "none", covers: true });
-    expect(problems).toEqual([]);
+    expect(problems, problems.join("\n")).toEqual([]);
   });
 
   test("is on the sign-in screen too", async ({ browser }) => {

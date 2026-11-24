@@ -5,6 +5,32 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.6.1] - 2026-11-24
+
+### Changed
+
+- **Versioned files are cached for a year.** Static files requested with the
+  running release's number (`?v=1.6.1`) are sent with `immutable` and a one-year
+  lifetime, so pages load without checking the server for every script and style.
+  Anything else, and every development build, is still revalidated each time.
+- **A development build says so.** A build that is not a release reports
+  `0.0.0-dev` instead of the made-up `0.1.0`, in the footer and `--version`.
+- **Faster first load.** The logo (also the favicon) was a 657 KB SVG that only
+  wrapped a PNG; it is now an 18 KB PNG.
+- **Tidier source.** The dashboard script is split into one file per area, the
+  Python-era leftovers and unused code are gone, and the README screenshots show
+  the current look. `npm run screenshots` in `frontend/` regenerates them from the
+  demo data.
+
+### Fixed
+
+- **Upgrades no longer show an old stylesheet behind a caching proxy.** A reverse
+  proxy that caches assets for hours (Nginx Proxy Manager's "Cache Assets") kept
+  serving the previous release's CSS and scripts, so new features looked missing
+  after an upgrade. Static files are now requested with the release number
+  (`/static/css/tailwind.css?v=1.6.1`), so each release is a new file to every
+  browser and cache.
+
 ## [1.6.0] - 2026-11-24
 
 ### Added

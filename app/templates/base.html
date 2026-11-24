@@ -10,7 +10,7 @@
     <meta name="portbridge-version" content="{{ app_version }}">
     <meta name="portbridge-update-check" content="{{ 'on' if update_check else 'off' }}">
     <title>WireGuard Manager</title>
-    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/logo.svg') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -42,6 +42,13 @@
     <script src="{{ url_for('static', filename='js/tones.js') }}"></script>
     <script src="{{ url_for('static', filename='js/updates.js') }}"></script>
     <script src="{{ url_for('static', filename='js/route-access.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app/shell.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app/dashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app/clients.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app/peer-settings.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app/routes.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app/forwarding.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app/update-notice.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 

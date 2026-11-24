@@ -10,10 +10,22 @@ needs no Node.
 | Path | What |
 | --- | --- |
 | `app/templates/` | Jinja pages and `components/` partials |
-| `app/static/js/` | Our own scripts (`app.js`, `login.js`, `route-access.js`, `theme.js`, `tones.js`) |
+| `app/static/js/` | Our own scripts (`login.js`, `route-access.js`, `theme.js`, `tones.js`, `updates.js`) |
+| `app/static/js/app.js` and `app/static/js/app/` | The dashboard's Alpine component, in one piece per area (see below) |
 | `app/static/css/tailwind.css` | **Generated**. Do not edit by hand |
 | `app/static/vendor/` | Vendored third-party bundles and their licences |
 | `frontend/` | Tailwind config, input CSS and `package.json` |
+
+## The dashboard script
+
+The dashboard is one Alpine component, `app()`, assembled in `app.js` from one file
+per area in `app/static/js/app/`: `shell` (navigation, theme, dialogs, toasts, data
+refresh, formatting), `dashboard`, `clients`, `peer-settings`, `routes`,
+`forwarding` and `update-notice`. Each file registers a factory on
+`window.PortBridgeFeatures`, and `app.js` merges them into one object, so a piece
+can call another's methods through `this`. A name defined in two pieces is an
+error at load time. To add an area, create a file, add its script tag to
+`base.html` and its name to `FEATURES` in `app.js`.
 
 ## Changing styles
 
@@ -64,3 +76,19 @@ To prove a styling change did not alter how anything looks, compare screenshots
 VISUAL=1 npx playwright test visual --update-snapshots   # on the old code
 VISUAL=1 npx playwright test visual                      # on the new code
 ```
+
+## README screenshots
+
+The screenshots in `images/screenshots/` are generated from the demo data (the
+same server the browser tests use), so they never show real peers and are easy to
+refresh after a UI change:
+
+```sh
+cd frontend
+npm run screenshots
+```
+
+It builds the demo server, opens each page at 1600 pixels wide, resizes the window
+to fit the whole page, and writes the six images at 2000 pixels wide. The footer
+shows the newest version in `CHANGELOG.md` rather than the development build's
+`0.0.0-dev`.

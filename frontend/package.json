@@ -7,13 +7,13 @@
     "watch:css": "tailwindcss -c tailwind.config.js -i src/tailwind.css -o ../app/static/css/tailwind.css --watch",
     "test:e2e": "playwright test",
     "test:visual": "VISUAL=1 playwright test visual",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --test \"test/*.test.js\"",
+    "screenshots": "node scripts/screenshots.js"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",
     "@tailwindcss/container-queries": "0.1.1",
     "@tailwindcss/forms": "0.5.10",
-    "@tailwindcss/typography": "0.5.16",
     "tailwindcss": "3.4.17"
   }
 }

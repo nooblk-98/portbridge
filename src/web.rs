@@ -73,8 +73,13 @@ pub fn templates(config: &Config) -> Environment<'static> {
                     format!("unknown endpoint {endpoint}"),
                 ));
             }
+            // The release number in the address makes every release a new file for
+            // browsers and caches. A reverse proxy that caches assets for hours
+            // (Nginx Proxy Manager's "Cache Assets") would otherwise keep serving
+            // the old stylesheet and scripts after an upgrade.
             Ok(minijinja::value::Value::from_safe_string(format!(
-                "/static/{filename}"
+                "/static/{filename}?v={}",
+                crate::version()
             )))
         },
     );
@@ -121,8 +126,29 @@ pub fn router(state: AppState) -> Router {
         .with_state(state)
 }
 
+/// How long browsers and caches may keep a static file. A file requested with this
+/// release's number never changes, so it is kept for a year. Anything else is
+/// revalidated each time: no number, another release's number, or a development
+/// build, whose files change under one number while you work on them.
+fn static_cache_control(query: Option<&str>, version: &str, release_build: bool) -> HeaderValue {
+    let requested =
+        query.and_then(|query| query.split('&').find_map(|part| part.strip_prefix("v=")));
+    if release_build && requested == Some(version) {
+        HeaderValue::from_static("public, max-age=31536000, immutable")
+    } else {
+        HeaderValue::from_static("public, no-cache")
+    }
+}
+
 async fn security_headers(State(state): State<AppState>, request: Request, next: Next) -> Response {
     let is_static = request.uri().path().starts_with("/static/");
+    let static_cache = is_static.then(|| {
+        static_cache_control(
+            request.uri().query(),
+            crate::version(),
+            crate::is_release_build(),
+        )
+    });
     let token = (!is_static)
         .then(|| {
             state
@@ -135,12 +161,11 @@ async fn security_headers(State(state): State<AppState>, request: Request, next:
         header::CONTENT_SECURITY_POLICY,
         content_security_policy(state.config.update_check),
     );
-    if is_static {
+    if let Some(cache_control) = static_cache {
         if response.status().is_success() || response.status() == StatusCode::NOT_MODIFIED {
-            response.headers_mut().insert(
-                header::CACHE_CONTROL,
-                HeaderValue::from_static("public, no-cache"),
-            );
+            response
+                .headers_mut()
+                .insert(header::CACHE_CONTROL, cache_control);
         }
     } else {
         response
@@ -149,7 +174,7 @@ async fn security_headers(State(state): State<AppState>, request: Request, next:
         response
             .headers_mut()
             .insert(header::VARY, HeaderValue::from_static("Cookie"));
-        // Flask refreshes the session cookie on every authenticated response.
+        // Keep the session alive: refresh its cookie on every authenticated response.
         if let Some(token) = token.filter(|_| !response.headers().contains_key(header::SET_COOKIE))
         {
             let cookie = format!("session={token}; HttpOnly; Path=/; SameSite=Lax");
@@ -161,8 +186,8 @@ async fn security_headers(State(state): State<AppState>, request: Request, next:
     response
 }
 
-/// Flask's JSON provider sorts keys and uses compact separators; match it so the
-/// dashboard API is byte-compatible with the reference backend.
+/// JSON with sorted keys and compact separators, so API responses are stable from
+/// one request to the next.
 pub fn json_response(status: StatusCode, value: Value) -> Response {
     let sorted = sort_json(value);
     let mut body = serde_json::to_string(&sorted).unwrap_or_else(|_| "{}".to_string());
@@ -703,6 +728,47 @@ mod footer_tests {
             .render(minijinja::context! {})
             .expect("render");
         assert!(html.contains("<meta name=\"portbridge-update-check\" content=\"on\">"));
+    }
+
+    #[test]
+    fn only_files_of_this_release_are_cached_for_a_year() {
+        let forever = "public, max-age=31536000, immutable";
+        let revalidate = "public, no-cache";
+        let cache = |query, release| {
+            static_cache_control(query, "1.6.1", release)
+                .to_str()
+                .unwrap()
+                .to_string()
+        };
+        assert_eq!(cache(Some("v=1.6.1"), true), forever);
+        assert_eq!(cache(Some("a=1&v=1.6.1"), true), forever);
+        // Another release's number, no number, or something else: revalidate.
+        assert_eq!(cache(Some("v=1.6.0"), true), revalidate);
+        assert_eq!(cache(Some("v=1.6.10"), true), revalidate);
+        assert_eq!(cache(Some("version=1.6.1"), true), revalidate);
+        assert_eq!(cache(None, true), revalidate);
+        // A development build edits files under one number, so it never caches them.
+        assert_eq!(cache(Some("v=1.6.1"), false), revalidate);
+    }
+
+    #[test]
+    fn every_static_file_is_requested_with_the_release_number() {
+        let version = crate::version();
+        for page in ["index.html", "login.html"] {
+            let html = render_page(page);
+            let references: Vec<&str> = html.split("/static/").skip(1).collect();
+            assert!(
+                references.len() >= 5,
+                "{page} should load several static files"
+            );
+            for reference in references {
+                let address = reference.split('"').next().unwrap();
+                assert!(
+                    address.ends_with(&format!("?v={version}")),
+                    "{page}: /static/{address} has no release number"
+                );
+            }
+        }
     }
 
     #[test]
