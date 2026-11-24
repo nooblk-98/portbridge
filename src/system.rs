@@ -44,6 +44,28 @@ pub fn percent(part: u64, whole: u64) -> f64 {
     }
 }
 
+/// Choose which disk to report for `data_dir` from `(mount point, total size)`.
+///
+/// The mount that holds the directory wins, but a service sandbox can expose
+/// the same filesystem again at the data directory itself (a bind mount). When a
+/// parent mount has the same size, that parent is the real filesystem and gives
+/// a clearer label than the bind mount. With no match, the largest disk is used.
+pub fn pick_disk(data_dir: &std::path::Path, disks: &[(&std::path::Path, u64)]) -> Option<usize> {
+    let mut holding: Vec<usize> = (0..disks.len())
+        .filter(|&index| data_dir.starts_with(disks[index].0))
+        .collect();
+    holding.sort_by_key(|&index| disks[index].0.as_os_str().len());
+    if let Some(&deepest) = holding.last() {
+        let total = disks[deepest].1;
+        return holding
+            .iter()
+            .copied()
+            .find(|&index| disks[index].1 == total)
+            .or(Some(deepest));
+    }
+    (0..disks.len()).max_by_key(|&index| disks[index].1)
+}
+
 impl SystemMonitor {
     pub fn new(data_dir: PathBuf) -> Self {
         let mut system = System::new().ok();
@@ -88,11 +110,12 @@ impl SystemMonitor {
                 .data_dir
                 .canonicalize()
                 .unwrap_or_else(|_| self.data_dir.clone());
-            let disk = disks
+            let candidates: Vec<(&std::path::Path, u64)> = disks
                 .iter()
-                .filter(|disk| data_dir.starts_with(disk.mount_point()))
-                .max_by_key(|disk| disk.mount_point().as_os_str().len())
-                .or_else(|| disks.iter().max_by_key(|disk| disk.total_space()));
+                .map(|disk| (disk.mount_point(), disk.total_space()))
+                .collect();
+            let chosen = pick_disk(&data_dir, &candidates);
+            let disk = chosen.map(|index| &disks[index]);
             if let Some(disk) = disk {
                 stats.disk_total = disk.total_space();
                 stats.disk_used = disk.total_space().saturating_sub(disk.available_space());
@@ -117,6 +140,29 @@ mod tests {
         assert_eq!(percent(0, 0), 0.0);
         assert_eq!(percent(50, 200), 25.0);
         assert_eq!(percent(300, 200), 100.0);
+    }
+
+    #[test]
+    fn disk_choice_prefers_the_real_filesystem_over_a_bind_mount() {
+        use std::path::Path;
+        let data = Path::new("/var/lib/portbridge");
+        // A sandbox bind mount repeats the root filesystem at the data directory.
+        let disks = [
+            (Path::new("/"), 50),
+            (Path::new("/boot"), 1),
+            (Path::new("/var/lib/portbridge"), 50),
+        ];
+        assert_eq!(pick_disk(data, &disks), Some(0));
+        // A dedicated data volume has its own size and is reported as itself.
+        let volume = [
+            (Path::new("/"), 50),
+            (Path::new("/var/lib/portbridge"), 200),
+        ];
+        assert_eq!(pick_disk(data, &volume), Some(1));
+        // Nothing contains the directory: fall back to the largest disk.
+        let other = [(Path::new("/mnt/a"), 10), (Path::new("/mnt/b"), 30)];
+        assert_eq!(pick_disk(data, &other), Some(1));
+        assert_eq!(pick_disk(data, &[]), None);
     }
 
     #[test]
