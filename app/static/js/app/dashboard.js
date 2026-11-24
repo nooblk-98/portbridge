@@ -46,9 +46,9 @@
             }, 10000);
         },
 
-        /** Redraw the chart in the new theme's colours. */
+        /** Recolour the chart for the new theme. */
         onThemeChange() {
-            if (trafficChart) this.renderTrafficChart(true);
+            if (trafficChart) this.renderTrafficChart();
         },
 
         /** `stroke-dasharray` for a ring that is `percent` full. */
@@ -218,8 +218,13 @@
             return time;
         },
 
-        /** Draw or update the traffic chart. `recreate` rebuilds it, for theme changes. */
-        renderTrafficChart(recreate = false) {
+        /**
+         * Draw the traffic chart, or update it with new data and the current theme's
+         * colours. It is never destroyed and rebuilt: Chart.js puts the canvas back
+         * the way it found it on destroy, and Alpine had it hidden at that moment, so
+         * a rebuilt chart stayed invisible until the page was reloaded.
+         */
+        renderTrafficChart() {
             const canvas = this.$refs.trafficCanvas;
             if (!canvas || !window.Chart || !this.history) return;
             const dark = this.isDarkMode;
@@ -241,13 +246,12 @@
             ];
             const labels = points.map(point => this.chartLabel(point.t));
 
-            if (trafficChart && recreate) {
-                trafficChart.destroy();
-                trafficChart = null;
-            }
             if (trafficChart) {
                 trafficChart.data.labels = labels;
                 trafficChart.data.datasets.forEach((dataset, index) => { dataset.data = datasets[index].data; });
+                trafficChart.options.scales.x.ticks.color = ticks;
+                trafficChart.options.scales.y.ticks.color = ticks;
+                trafficChart.options.scales.y.grid.color = grid;
                 trafficChart.update();
                 return;
             }
