@@ -3,6 +3,10 @@ FROM rust:1.100-alpine3.22 AS build
 
 RUN apk add --no-cache build-base
 
+# Release tag reported by `portbridge --version`; empty for local builds.
+ARG PORTBRIDGE_VERSION=
+ENV PORTBRIDGE_VERSION=$PORTBRIDGE_VERSION
+
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src

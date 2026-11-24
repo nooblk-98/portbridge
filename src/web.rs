@@ -245,7 +245,7 @@ async fn auth_login(
         .password_matches(password, &state.config.admin_password)
     {
         state.auth.clear_rate_limit(peer.ip());
-        return match state.auth.login(password) {
+        return match state.auth.login(&state.config.admin_password) {
             Ok(cookies) => with_cookies(
                 json_response(StatusCode::OK, json!({"status": "ok"})),
                 cookies,

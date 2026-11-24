@@ -6,8 +6,36 @@ use portbridge::config::Config;
 use portbridge::web::{router, templates, AppState};
 use tokio::net::TcpListener;
 
+/// Handle `--version` and `hash-password` before any server setup.
+fn run_cli() -> Option<ExitCode> {
+    match std::env::args().nth(1).as_deref() {
+        Some("--version" | "-V" | "version") => {
+            println!("portbridge {}", portbridge::version());
+            Some(ExitCode::SUCCESS)
+        }
+        Some("hash-password") => {
+            let mut password = String::new();
+            if std::io::stdin().read_line(&mut password).is_err() {
+                eprintln!("Could not read the password from standard input.");
+                return Some(ExitCode::FAILURE);
+            }
+            let password = password.trim_end_matches(['\r', '\n']);
+            if password.is_empty() {
+                eprintln!("Provide the password on standard input.");
+                return Some(ExitCode::FAILURE);
+            }
+            println!("{}", portbridge::auth::hash_password(password));
+            Some(ExitCode::SUCCESS)
+        }
+        _ => None,
+    }
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
+    if let Some(code) = run_cli() {
+        return code;
+    }
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -33,7 +61,7 @@ Clients will receive an unusable config. Set WG_HOST to your server's public IP 
         eprintln!("Bootstrap failed: {error}");
         return ExitCode::FAILURE;
     }
-    tracing::info!("Bootstrap complete");
+    tracing::info!("Bootstrap complete (version {})", portbridge::version());
 
     let templates = Arc::new(templates(&services.config));
     let state = AppState {

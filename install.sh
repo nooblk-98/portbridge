@@ -2,12 +2,39 @@
 set -euo pipefail
 umask 077
 
-if [[ ${EUID} -ne 0 || $# -ne 1 ]]; then
-    echo "Usage: sudo bash install.sh <public WireGuard hostname or IP>" >&2
-    exit 1
-fi
 
-endpoint=$1
+usage() {
+    cat >&2 <<'USAGE'
+Usage:
+  sudo bash install.sh <public WireGuard hostname or IP>   Install PortBridge
+  sudo bash install.sh --upgrade                           Upgrade to the latest release
+  sudo bash install.sh --uninstall [--purge]               Remove PortBridge (--purge also deletes peers and keys)
+USAGE
+    exit 1
+}
+
+mode=install
+purge=0
+endpoint=
+case ${1:-} in
+    --upgrade) mode=upgrade; shift ;;
+    --uninstall)
+        mode=uninstall
+        shift
+        if [[ ${1:-} == --purge ]]; then purge=1; shift; fi
+        ;;
+    -h | --help) usage ;;
+esac
+if [[ ${EUID} -ne 0 ]]; then
+    echo "Run the installer as root, for example with sudo." >&2
+    usage
+fi
+if [[ $mode == install ]]; then
+    [[ $# -eq 1 ]] || usage
+    endpoint=$1
+else
+    [[ $# -eq 0 ]] || usage
+fi
 
 # When piped from curl or wget there is no script file, so there is no local
 # release archive and the latest release is downloaded instead.
@@ -56,22 +83,6 @@ is_hostname() {
     done
 }
 
-if ! is_ipv4 "$endpoint" && ! is_ipv6 "$endpoint" && ! is_hostname "$endpoint"; then
-    die "Supply a hostname or bare IP address, without a URL, port or zone."
-fi
-
-for path in "$app_dir" "$config_dir" "$state_dir" "$unit"; do
-    if [[ -e $path || -L $path ]]; then
-        die "Existing path: $path. This installer is for fresh installations."
-    fi
-done
-if ! command -v apt-get >/dev/null || ! command -v systemctl >/dev/null || [[ ! -d /run/systemd/system ]]; then
-    die "This installer requires Debian or Ubuntu with systemd."
-fi
-if [[ -e /etc/wireguard/pb0.conf ]] || ip link show dev pb0 >/dev/null 2>&1; then
-    die "The pb0 WireGuard interface is already in use."
-fi
-
 download() {
     local url=$1 out=$2
     if command -v curl >/dev/null; then
@@ -114,6 +125,45 @@ fetch_release() {
     portbridge_bin=$source_dir/portbridge
 }
 
+if [[ $mode == uninstall ]]; then
+    systemctl disable --now portbridge.service </dev/null 2>/dev/null || true
+    rm -f "$unit"
+    systemctl daemon-reload </dev/null 2>/dev/null || true
+    rm -rf "$app_dir" "$config_dir"
+    if [[ $purge -eq 1 ]]; then
+        rm -rf "$state_dir"
+        echo "PortBridge was removed, including its peers and keys."
+    else
+        echo "PortBridge was removed. Peers and keys remain in $state_dir (use --uninstall --purge to delete them)."
+    fi
+    exit 0
+fi
+
+if ! command -v apt-get >/dev/null || ! command -v systemctl >/dev/null || [[ ! -d /run/systemd/system ]]; then
+    die "This installer requires Debian or Ubuntu with systemd."
+fi
+
+if [[ $mode == install ]]; then
+    if ! is_ipv4 "$endpoint" && ! is_ipv6 "$endpoint" && ! is_hostname "$endpoint"; then
+        die "Supply a hostname or bare IP address, without a URL, port or zone."
+    fi
+    for path in "$app_dir" "$config_dir" "$unit"; do
+        if [[ -e $path || -L $path ]]; then
+            die "Existing path: $path. Use --upgrade to update, or --uninstall first."
+        fi
+    done
+    if [[ -e /etc/wireguard/pb0.conf ]] || ip link show dev pb0 >/dev/null 2>&1; then
+        die "The pb0 WireGuard interface is already in use."
+    fi
+    if [[ -e $state_dir ]]; then
+        echo "Reusing existing PortBridge data in $state_dir."
+    fi
+else
+    if [[ ! -x $app_dir/portbridge || ! -f $unit ]]; then
+        die "PortBridge is not installed. Run the installer with your hostname or IP first."
+    fi
+fi
+
 # A release archive keeps the binary next to install.sh; a source checkout
 # passes PORTBRIDGE_BINARY explicitly; otherwise the latest release is fetched.
 work_dir=
@@ -132,6 +182,23 @@ if [[ -z $source_dir || ! -f $source_dir/app/templates/login.html || ! -f $sourc
     die "The installer is missing the dashboard files (app/templates and app/static). Use a complete release archive or repository checkout."
 fi
 
+if [[ $mode == upgrade ]]; then
+    # Replace the program and dashboard files; settings, peers and keys stay.
+    stage=$app_dir/.upgrade.$$
+    install -d -m 0750 "$stage" "$stage/app"
+    cp -R "$source_dir/app/." "$stage/app/"
+    install -m 0755 "$portbridge_bin" "$stage/portbridge"
+    mv -f "$stage/portbridge" "$app_dir/portbridge"
+    rm -rf "$app_dir/app.old"
+    mv "$app_dir/app" "$app_dir/app.old"
+    mv "$stage/app" "$app_dir/app"
+    rm -rf "$stage" "$app_dir/app.old"
+    systemctl restart portbridge.service </dev/null
+    systemctl is-active --quiet portbridge.service </dev/null
+    echo "PortBridge was upgraded to $("$app_dir/portbridge" --version </dev/null) and restarted."
+    exit 0
+fi
+
 # Read from the terminal so the prompt also works when the script is piped in.
 if ! read -rsp "Dashboard password (at least 16 letters or numbers): " password </dev/tty; then
     echo
@@ -141,6 +208,18 @@ echo
 if [[ ! $password =~ ^[A-Za-z0-9]{16,128}$ ]]; then
     die "Choose a password of 16 to 128 letters or numbers."
 fi
+
+# Store a salted hash instead of the password. Older releases cannot hash, so
+# fall back to the plaintext setting for them.
+password_setting=
+password_hash=$("$portbridge_bin" hash-password <<<"$password" 2>/dev/null || true)
+if [[ $password_hash =~ ^pbkdf2-sha256\$[0-9]+\$[0-9a-f]+\$[0-9a-f]{64}$ ]]; then
+    password_setting="ADMIN_PASSWORD_HASH=$password_hash"
+else
+    echo "This release cannot hash passwords; storing the password in $config_dir/portbridge.env." >&2
+    password_setting="ADMIN_PASSWORD=$password"
+fi
+unset password
 
 # Child commands read /dev/null so they cannot consume a script piped on stdin.
 apt-get update </dev/null
@@ -156,13 +235,12 @@ WG_HOST=$endpoint
 WG_INTERFACE=pb0
 WG_CONFIG_PATH=$config_dir/pb0.conf
 DATA_DIR=$state_dir
-ADMIN_PASSWORD=$password
+$password_setting
 SEED_FORWARDING=0
 ENABLE_IPV4_FORWARDING=1
 APP_HOST=127.0.0.1
 APP_PORT=3000
 ENV
-unset password
 
 cat > "$unit" <<'UNIT'
 [Unit]
@@ -188,6 +266,7 @@ Restart=on-failure
 WantedBy=multi-user.target
 UNIT
 chmod 0644 "$unit"
+systemctl daemon-reload
 systemctl daemon-reload
 systemctl enable --now portbridge.service
 systemctl is-active --quiet portbridge.service

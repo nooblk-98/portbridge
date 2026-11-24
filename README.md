@@ -63,12 +63,21 @@ wget -qO- https://raw.githubusercontent.com/nooblk-98/portbridge/main/install.sh
 
 To pin a version, set `PORTBRIDGE_VERSION` on the `sudo` side, for example `| sudo PORTBRIDGE_VERSION=v1.0.0 bash -s -- vpn.example.com`.
 
-The installer prompts for a dashboard password (16–128 letters or numbers), creates the `pb0` WireGuard interface, stores data in `/var/lib/portbridge`, and starts the `portbridge` service. Use the SSH tunnel above to reach the dashboard.
+The installer prompts for a dashboard password (16–128 letters or numbers) and stores only a salted hash of it. It creates the `pb0` WireGuard interface, stores data in `/var/lib/portbridge`, and starts the `portbridge` service. Use the SSH tunnel above to reach the dashboard.
 
 ```sh
 sudo systemctl status portbridge
 sudo journalctl -u portbridge -e
 ```
+
+To upgrade to the latest release or remove PortBridge, run the same script with a flag:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/nooblk-98/portbridge/main/install.sh | sudo bash -s -- --upgrade
+curl -fsSL https://raw.githubusercontent.com/nooblk-98/portbridge/main/install.sh | sudo bash -s -- --uninstall
+```
+
+An upgrade keeps your settings, peers and keys. An uninstall keeps peers and keys in `/var/lib/portbridge` unless you add `--purge`.
 
 <details>
 <summary>Build from source</summary>
@@ -119,7 +128,8 @@ PortBridge is configured through environment variables.
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `ADMIN_PASSWORD` | required | Dashboard password |
+| `ADMIN_PASSWORD` | required unless a hash is set | Dashboard password |
+| `ADMIN_PASSWORD_HASH` | unset | Salted PBKDF2 hash used instead of `ADMIN_PASSWORD`. Create one with `echo -n 'your-password' \| portbridge hash-password` |
 | `WG_HOST` | `127.0.0.1` | Public hostname or IP written into peer configs |
 | `WG_PORT` | `51820` | WireGuard UDP port |
 | `WG_NETWORK` | `10.8.0.0/24` | VPN subnet |
@@ -130,7 +140,7 @@ PortBridge is configured through environment variables.
 
 ## Upgrading
 
-Keep the same Compose project name and data volume. If you are upgrading from the earlier Python version, sign in again and recreate legacy public forwards for the intended peers.
+On Debian or Ubuntu, use `--upgrade` as shown above. With Docker, pull the new image and recreate the container. Keep the same Compose project name and data volume. If you are upgrading from the earlier Python version, sign in again and recreate legacy public forwards for the intended peers.
 
 ## Development
 

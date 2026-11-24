@@ -85,7 +85,12 @@ impl Auth {
         to_hex(&mac.finalize().into_bytes())
     }
 
+    /// Compare a supplied password with the configured secret, which is either
+    /// a plaintext password or a `pbkdf2-sha256$...` hash.
     pub fn password_matches(&self, supplied: &str, expected: &str) -> bool {
+        if is_password_hash(expected) {
+            return verify_password_hash(supplied, expected);
+        }
         let supplied = supplied.as_bytes();
         let expected = expected.as_bytes();
         if supplied.len() != expected.len() {
@@ -295,6 +300,91 @@ fn now_epoch() -> u64 {
         .unwrap_or(0)
 }
 
+const HASH_PREFIX: &str = "pbkdf2-sha256";
+const HASH_ITERATIONS: u32 = 600_000;
+const MAX_HASH_ITERATIONS: u32 = 10_000_000;
+const SALT_LEN: usize = 16;
+
+/// PBKDF2-HMAC-SHA256 producing a single 32-byte block.
+fn pbkdf2_sha256(password: &[u8], salt: &[u8], iterations: u32) -> [u8; 32] {
+    let base = HmacSha256::new_from_slice(password).expect("HMAC accepts any key length");
+    let mut mac = base.clone();
+    mac.update(salt);
+    mac.update(&1u32.to_be_bytes());
+    let mut block = mac.finalize().into_bytes();
+    let mut output = block;
+    for _ in 1..iterations {
+        let mut mac = base.clone();
+        mac.update(&block);
+        block = mac.finalize().into_bytes();
+        for (out, byte) in output.iter_mut().zip(block.iter()) {
+            *out ^= byte;
+        }
+    }
+    let mut result = [0u8; 32];
+    result.copy_from_slice(&output);
+    result
+}
+
+fn from_hex(text: &str) -> Option<Vec<u8>> {
+    if !text.len().is_multiple_of(2) || !text.is_ascii() {
+        return None;
+    }
+    (0..text.len())
+        .step_by(2)
+        .map(|index| u8::from_str_radix(&text[index..index + 2], 16).ok())
+        .collect()
+}
+
+/// Split `pbkdf2-sha256$iterations$salt_hex$hash_hex` into its parts.
+fn parse_password_hash(value: &str) -> Option<(u32, Vec<u8>, Vec<u8>)> {
+    let mut parts = value.split('$');
+    if parts.next()? != HASH_PREFIX {
+        return None;
+    }
+    let iterations: u32 = parts.next()?.parse().ok()?;
+    let salt = from_hex(parts.next()?)?;
+    let hash = from_hex(parts.next()?)?;
+    if parts.next().is_some()
+        || !(1..=MAX_HASH_ITERATIONS).contains(&iterations)
+        || salt.is_empty()
+        || hash.len() != 32
+    {
+        return None;
+    }
+    Some((iterations, salt, hash))
+}
+
+/// True when the value uses the password hash format (even if malformed).
+pub fn is_password_hash(value: &str) -> bool {
+    value.starts_with("pbkdf2-sha256$")
+}
+
+/// True when the value is a well-formed password hash.
+pub fn is_valid_password_hash(value: &str) -> bool {
+    parse_password_hash(value).is_some()
+}
+
+/// Hash a password with a random salt for use as `ADMIN_PASSWORD_HASH`.
+pub fn hash_password(password: &str) -> String {
+    let mut salt = [0u8; SALT_LEN];
+    OsRng.fill_bytes(&mut salt);
+    let hash = pbkdf2_sha256(password.as_bytes(), &salt, HASH_ITERATIONS);
+    format!(
+        "{HASH_PREFIX}${HASH_ITERATIONS}${}${}",
+        to_hex(&salt),
+        to_hex(&hash)
+    )
+}
+
+fn verify_password_hash(supplied: &str, expected: &str) -> bool {
+    let Some((iterations, salt, hash)) = parse_password_hash(expected) else {
+        return false;
+    };
+    let derived = pbkdf2_sha256(supplied.as_bytes(), &salt, iterations);
+    derived.ct_eq(hash.as_slice()).into()
+}
+
 pub fn sha256_hex(content: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(content.as_bytes());
@@ -308,4 +398,43 @@ pub fn to_hex(bytes: &[u8]) -> String {
         let _ = write!(output, "{byte:02x}");
     }
     output
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pbkdf2_matches_rfc_vectors() {
+        assert_eq!(
+            to_hex(&pbkdf2_sha256(b"password", b"salt", 1)),
+            "120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b"
+        );
+        assert_eq!(
+            to_hex(&pbkdf2_sha256(b"password", b"salt", 2)),
+            "ae4d0c95af6b46d32d0adff928f06dd02a303f8ef3c251dfd6e2d85a95474c43"
+        );
+    }
+
+    #[test]
+    fn password_hash_round_trips() {
+        assert!(is_valid_password_hash(&hash_password("generated")));
+        let salt = [7u8; SALT_LEN];
+        let hash = format!(
+            "{HASH_PREFIX}$1000${}${}",
+            to_hex(&salt),
+            to_hex(&pbkdf2_sha256(b"correct horse battery", &salt, 1000))
+        );
+        assert!(is_valid_password_hash(&hash));
+        assert!(verify_password_hash("correct horse battery", &hash));
+        assert!(!verify_password_hash("wrong password", &hash));
+    }
+
+    #[test]
+    fn malformed_hashes_are_rejected() {
+        assert!(!is_valid_password_hash("pbkdf2-sha256$0$aa$bb"));
+        assert!(!is_valid_password_hash("pbkdf2-sha256$1000$zz$00"));
+        assert!(!is_valid_password_hash("plain-password"));
+        assert!(!verify_password_hash("x", "pbkdf2-sha256$bad"));
+    }
 }

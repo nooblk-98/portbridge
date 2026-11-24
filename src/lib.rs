@@ -14,6 +14,15 @@ pub mod wireguard;
 
 use std::sync::Arc;
 
+/// Release version: the `PORTBRIDGE_VERSION` build variable (a release tag)
+/// when set, otherwise the crate version.
+pub fn version() -> &'static str {
+    match option_env!("PORTBRIDGE_VERSION") {
+        Some(tag) if !tag.is_empty() => tag.trim_start_matches('v'),
+        _ => env!("CARGO_PKG_VERSION"),
+    }
+}
+
 use crate::auth::Auth;
 use crate::client_manager::ClientManager;
 use crate::config::Config;

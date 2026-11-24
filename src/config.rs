@@ -98,12 +98,32 @@ pub fn validate_admin_password(value: Option<&str>) -> Result<String, AppError> 
             "Set ADMIN_PASSWORD to a non-default password before starting PortBridge.",
         ));
     }
+    if crate::auth::is_password_hash(value) {
+        return Err(AppError::config(
+            "ADMIN_PASSWORD looks like a password hash. Put hashes in ADMIN_PASSWORD_HASH.",
+        ));
+    }
+    Ok(value.to_string())
+}
+
+/// Accept a well-formed `ADMIN_PASSWORD_HASH` produced by `portbridge hash-password`.
+pub fn validate_admin_password_hash(value: &str) -> Result<String, AppError> {
+    let value = value.trim();
+    if !crate::auth::is_valid_password_hash(value) {
+        return Err(AppError::config(
+            "ADMIN_PASSWORD_HASH is not valid. Create one with: portbridge hash-password",
+        ));
+    }
     Ok(value.to_string())
 }
 
 impl Config {
     pub fn from_env() -> Result<Self, AppError> {
-        let admin_password = validate_admin_password(env::var("ADMIN_PASSWORD").ok().as_deref())?;
+        // A hash takes precedence so the plaintext password need not be stored.
+        let admin_password = match var("ADMIN_PASSWORD_HASH") {
+            Some(hash) => validate_admin_password_hash(&hash)?,
+            None => validate_admin_password(env::var("ADMIN_PASSWORD").ok().as_deref())?,
+        };
         let data_dir = PathBuf::from(env::var("DATA_DIR").unwrap_or_else(|_| "/data".to_string()));
         let clients_dir = data_dir.join("clients");
         let clients_file = data_dir.join("clients.json");

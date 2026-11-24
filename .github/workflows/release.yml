@@ -1,34 +1,48 @@
 name: Release
 
-# Every merge to main (a merged PR is a push to main) gets a new patch tag,
-# static Linux binaries, and a published release marked as latest.
+# Every code change merged to main (a merged PR is a push to main) is verified,
+# given a new patch tag, built into static Linux binaries, and published as the
+# latest release. Documentation-only pushes do not release.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "images/**"
+      - "LICENSE"
+      - ".agents/**"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
+  verify:
+    name: Verify
+    uses: ./.github/workflows/verify.yml
+
   tag:
     name: Tag and draft release
+    needs: verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       new_tag: ${{ steps.tag.outputs.new_tag }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
 
       - name: Bump tag automatically
         id: tag
-        uses: anothrNick/github-tag-action@1.71.0
+        uses: anothrNick/github-tag-action@f278d49d30cdd8775cc3e7dd00b5ee11686ee297 # 1.71.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEFAULT_BUMP: patch
@@ -37,7 +51,7 @@ jobs:
 
       - name: Create draft release
         if: steps.tag.outputs.new_tag != ''
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ steps.tag.outputs.new_tag }}
           generate_release_notes: true
@@ -67,8 +81,12 @@ jobs:
         run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
 
       # Events created with GITHUB_TOKEN do not start other workflows, so ask
-      # the Docker publish workflow to run explicitly.
+      # the Docker publish workflow to run explicitly, for this exact tag.
       - name: Request Docker image build
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api "repos/$GITHUB_REPOSITORY/dispatches" -f event_type=release-completed
+          TAG: ${{ needs.tag.outputs.new_tag }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/dispatches" \
+            -f event_type=release-completed \
+            -f "client_payload[tag]=$TAG"

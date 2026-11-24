@@ -105,6 +105,7 @@ jobs:
       - name: Build release binary
         env:
           TARGET: ${{ matrix.target }}
+          PORTBRIDGE_VERSION: ${{ needs.metadata.outputs.tag }}
         run: cargo build --release --locked --bin portbridge --target "$TARGET"
 
       - name: Verify binary architecture
