@@ -5,6 +5,16 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.5.1] - 2026-11-24
+
+### Fixed
+
+- The large faint icons behind the Total Clients, Active Ports and Network cards
+  were almost invisible, especially in dark mode. They are now clearly visible in
+  both themes.
+- The logo in the desktop sidebar showed inside a white square. It is now a plain
+  circle, like the logo on the phone header and the sign-in screen.
+
 ## [1.5.0] - 2026-11-24
 
 ### Added

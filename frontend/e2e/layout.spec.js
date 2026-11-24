@@ -59,6 +59,45 @@ test.describe("navigation", () => {
   });
 });
 
+test.describe("branding and decoration", () => {
+  test("the sidebar logo is a plain circle, not a logo inside a tile", async ({ page }) => {
+    test.skip((page.viewportSize()?.width ?? 1280) < 768, "the sidebar is desktop only");
+    await openPage(page, "/", "Dashboard");
+    const logo = page.locator("aside").getByRole("img", { name: "Port Bridge Logo" });
+    await expect(logo).toBeVisible();
+    const style = await logo.evaluate(node => {
+      const css = getComputedStyle(node);
+      return {
+        radius: css.borderTopLeftRadius,
+        padding: css.paddingTop,
+        background: css.backgroundColor,
+        shadow: css.boxShadow,
+      };
+    });
+    // A circle (rounded at least to half its 40px size), with no padding, fill or shadow tile around it.
+    expect(parseFloat(style.radius)).toBeGreaterThanOrEqual(20);
+    expect({ padding: style.padding, background: style.background, shadow: style.shadow }).toEqual({
+      padding: "0px",
+      background: "rgba(0, 0, 0, 0)",
+      shadow: "none",
+    });
+  });
+
+  for (const scheme of ["light", "dark"]) {
+    test(`the big icons behind the stat cards are clearly visible in ${scheme} mode`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme === "dark" ? "dark" : "light" });
+      await openPage(page, "/", "Dashboard");
+      for (const icon of ["group", "alt_route", "hub"]) {
+        const tile = page.locator("main span.material-symbols-rounded", { hasText: new RegExp(`^${icon}$`) }).first();
+        await expect(tile).toBeVisible();
+        const opacity = await tile.evaluate(node => Number(getComputedStyle(/** @type {Element} */ (node.parentElement)).opacity));
+        // They used to sit at 0.1, which was barely there.
+        expect(opacity, `${icon} icon opacity`).toBeGreaterThanOrEqual(0.25);
+      }
+    });
+  }
+});
+
 test.describe("footer", () => {
   test("there is exactly one footer, with the repository, version and author links", async ({ page }) => {
     await openPage(page, "/", "Dashboard");
