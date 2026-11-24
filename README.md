@@ -183,6 +183,12 @@ Open **Forwarding**, create a rule, and choose a public port, protocol, target p
 
 The service sees the original client address, so its replies must return through WireGuard. With a split-tunnel profile, add a return route for the permitted sources, or use a full-tunnel profile. Allow the public port through your firewalls, and for Docker add the port to the Compose `ports` list, for example `"30000:30000/tcp"`.
 
+### Reach peers from the server
+
+Programs on the server itself can open connections to peers: a Docker container such as Nginx Proxy Manager, a script, or `curl`. That makes the server a reverse proxy for services that live behind NAT. Point a proxy host at a peer's tunnel address (for example `http://10.10.0.2:8080`) or at a subnet the peer advertises (for example `http://192.168.1.106:8080`). Peers can only answer these connections. They cannot start new ones to the server's other services.
+
+Set `ALLOW_LOCAL_TO_PEERS=0` to turn this off.
+
 ### Internet access through the VPN
 
 Peers use split tunneling by default: only VPN and advertised-route traffic goes through the tunnel, so a device keeps its own internet connection and public IP. To send all of a device's traffic through the server, turn off **Split tunnel** in that peer's settings and re-import its profile. The server allows this by default. To block this, set `ALLOW_INTERNET_EGRESS=0` in `/etc/portbridge/portbridge.env` (or the Compose service environment) and restart.
@@ -202,6 +208,7 @@ PortBridge is configured through environment variables.
 | `APP_HOST` / `APP_PORT` | `0.0.0.0` / `3000` | Dashboard bind address |
 | `DATA_DIR` | `/data` | Where keys and state are stored |
 | `ALLOW_INTERNET_EGRESS` | allowed | Set to `0` to block peer internet access through the server |
+| `ALLOW_LOCAL_TO_PEERS` | allowed | Set to `0` to stop programs on the server, such as a Docker reverse proxy, from opening connections to peers |
 
 ## Upgrading
 

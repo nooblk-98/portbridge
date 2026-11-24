@@ -34,6 +34,7 @@ pub struct Config {
     pub template_dir: PathBuf,
     pub static_dir: PathBuf,
     pub allow_internet_egress: bool,
+    pub allow_local_to_peers: bool,
     pub seed_forwarding: bool,
     pub enable_ipv4_forwarding: bool,
     secret_key: Vec<u8>,
@@ -215,6 +216,12 @@ impl Config {
             static_dir,
             // Peers may reach the internet through the server unless this is
             // switched off with ALLOW_INTERNET_EGRESS=0.
+            // Services on this server, such as a Docker reverse proxy, may reach peers
+            // unless this is switched off with ALLOW_LOCAL_TO_PEERS=0.
+            allow_local_to_peers: !matches!(
+                env::var("ALLOW_LOCAL_TO_PEERS").as_deref(),
+                Ok("0" | "false")
+            ),
             allow_internet_egress: !matches!(
                 env::var("ALLOW_INTERNET_EGRESS").as_deref(),
                 Ok("0" | "false")
@@ -264,6 +271,7 @@ impl Config {
             nat_chain: "WG_FORWARDER".to_string(),
             filter_chain: "WG_FORWARDER_FWD".to_string(),
             allow_internet_egress: false,
+            allow_local_to_peers: true,
             seed_forwarding: false,
             enable_ipv4_forwarding: false,
         }

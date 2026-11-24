@@ -5,6 +5,24 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.2.5] - 2026-11-24
+
+### Fixed
+
+- Programs on the server that forward traffic, such as a Docker container
+  running a reverse proxy, could not open connections to peers or to subnets they
+  advertise, because PortBridge's firewall dropped everything entering the
+  tunnel. Servers that proxied peer services before moving to PortBridge saw
+  their proxy hosts return 502 errors.
+
+### Changed
+
+- New setting `ALLOW_LOCAL_TO_PEERS`, on by default. Programs on the server
+  other than the tunnel and the public interface may open connections to peers,
+  and peers may only answer them. Peers still cannot start connections to the
+  server's other services, and the internet still reaches peers only through a
+  forwarding rule. Set `ALLOW_LOCAL_TO_PEERS=0` for the previous behaviour.
+
 ## [1.2.4] - 2026-11-24
 
 ### Fixed
@@ -159,6 +177,7 @@ First release of the Rust version of PortBridge: a WireGuard server with a web
 dashboard, per-peer routes with access rules, and public TCP and UDP port
 forwarding.
 
+[1.2.5]: https://github.com/nooblk-98/portbridge/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/nooblk-98/portbridge/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/nooblk-98/portbridge/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/nooblk-98/portbridge/compare/v1.2.0...v1.2.2
