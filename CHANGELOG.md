@@ -15,6 +15,12 @@ notes for its version.
   Anything else, and every development build, is still revalidated each time.
 - **A development build says so.** A build that is not a release reports
   `0.0.0-dev` instead of the made-up `0.1.0`, in the footer and `--version`.
+- **Faster first load.** The logo (also the favicon) was a 657 KB SVG that only
+  wrapped a PNG; it is now an 18 KB PNG.
+- **Tidier source.** The dashboard script is split into one file per area, the
+  Python-era leftovers and unused code are gone, and the README screenshots show
+  the current look. `npm run screenshots` in `frontend/` regenerates them from the
+  demo data.
 
 ### Fixed
 
