@@ -62,6 +62,16 @@ impl ClientManager {
                 .collect();
             let peer_state = status.get(&client.public_key);
             let options = client.options();
+            // The effective setting, so the dashboard shows what is actually in force.
+            let mut option_map = options.as_map();
+            option_map.insert(
+                "local_access".to_string(),
+                Value::Bool(
+                    options
+                        .local_access
+                        .unwrap_or(self.config.allow_local_to_peers),
+                ),
+            );
             items.push(json!({
                 "name": client.name,
                 "address": format!("{}/{}", client.address, self.config.wg_prefix_len),
@@ -72,7 +82,7 @@ impl ClientManager {
                 "rx_bytes": peer_state.map(|state| state.rx_bytes).unwrap_or(0),
                 "tx_bytes": peer_state.map(|state| state.tx_bytes).unwrap_or(0),
                 "forwardings": forwards,
-                "options": Value::Object(options.as_map()),
+                "options": Value::Object(option_map),
             }));
             for route in &options.advertised_routes {
                 let allowed = allowed_recipient_keys(client, route, &clients);

@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 
 use crate::config::Config;
 use crate::error::AppError;
-use crate::model::{allowed_recipient_addresses, parse_cidr, validated_peers};
+use crate::model::{allowed_recipient_addresses, parse_cidr, validated_peers, Client};
 use crate::rule_renderer::{render_rule, rule_is_valid};
 use crate::runner::Runner;
 use crate::storage::Storage;
@@ -267,21 +267,19 @@ impl IPTablesService {
 
     /// The rules that end the forwarding chain.
     ///
-    /// Without `allow_local_to_peers` everything that enters or leaves the tunnel
-    /// and was not accepted above is dropped. With it, programs on this server
-    /// that are neither the tunnel nor the public interface (a Docker reverse
-    /// proxy, for example) may open connections to peers, and peers may only
-    /// answer them. Peers still cannot start connections to this server's other
-    /// services, reach each other outside route access, or be reached from the
-    /// internet except through a forwarding rule.
-    pub fn tunnel_policy(&self, ext_iface: &str) -> Vec<Vec<String>> {
-        if !self.config.allow_local_to_peers {
-            return self.tunnel_drops().to_vec();
-        }
+    /// Everything that enters or leaves the tunnel and was not accepted above is
+    /// dropped, except that programs on this server (a Docker reverse proxy, for
+    /// example) may open connections to the peers that allow it, and those peers
+    /// may answer. A peer allows it when its own setting says so, or, if it has
+    /// none, when `allow_local_to_peers` is on. Peers still cannot start
+    /// connections to this server's other services or reach each other outside
+    /// route access, and the internet reaches peers only through a forwarding
+    /// rule.
+    pub fn tunnel_policy(&self, ext_iface: &str, clients: &[Client]) -> Vec<Vec<String>> {
         let tunnel = self.config.wg_interface.as_str();
         let rule =
             |parts: &[&str]| -> Vec<String> { parts.iter().map(|part| part.to_string()).collect() };
-        vec![
+        let mut rules = vec![
             rule(&["-i", tunnel, "-o", tunnel, "-j", "DROP"]),
             rule(&["-i", tunnel, "-o", ext_iface, "-j", "DROP"]),
             rule(&[
@@ -296,8 +294,30 @@ impl IPTablesService {
             ]),
             rule(&["-i", tunnel, "-j", "DROP"]),
             rule(&["-i", ext_iface, "-o", tunnel, "-j", "DROP"]),
-            rule(&["-o", tunnel, "-j", "ACCEPT"]),
-        ]
+        ];
+        for client in validated_peers(clients) {
+            let options = client.options();
+            if !options
+                .local_access
+                .unwrap_or(self.config.allow_local_to_peers)
+            {
+                continue;
+            }
+            let mut destinations = vec![format!("{}/32", client.address)];
+            destinations.extend(options.advertised_routes);
+            for destination in &destinations {
+                rules.push(rule(&[
+                    "-o",
+                    tunnel,
+                    "-d",
+                    destination.as_str(),
+                    "-j",
+                    "ACCEPT",
+                ]));
+            }
+        }
+        rules.push(rule(&["-o", tunnel, "-j", "DROP"]));
+        rules
     }
 
     fn tunnel_drops(&self) -> [Vec<String>; 2] {
@@ -318,6 +338,7 @@ impl IPTablesService {
             self.storage.as_ref(),
             &self.config.clients_file.to_string_lossy(),
         )?;
+        let policy_clients = clients.clone();
         let owners: BTreeMap<String, String> = clients
             .into_iter()
             .map(|client| (client.address, client.public_key))
@@ -386,7 +407,7 @@ impl IPTablesService {
         }
         let mut policy = public;
         policy.extend(routing);
-        policy.extend(self.tunnel_policy(&ext_iface));
+        policy.extend(self.tunnel_policy(&ext_iface, &policy_clients));
         self.install_chain("filter", &self.config.filter_chain, "FORWARD", &policy)?;
         self.install_chain("nat", &self.config.nat_chain, "PREROUTING", &dnat)?;
         let mut masquerade = Vec::new();
@@ -442,6 +463,7 @@ mod tests {
     use super::*;
     use crate::runner::FakeRunner;
     use crate::storage::InMemoryStorage;
+    use serde_json::json;
 
     fn service(allow_local: bool) -> IPTablesService {
         let mut config = Config::for_test(std::env::temp_dir());
@@ -453,34 +475,91 @@ mod tests {
         )
     }
 
+    fn peer(name: &str, key: &str, address: &str, extra: serde_json::Value) -> Client {
+        Client {
+            name: name.to_string(),
+            address: address.to_string(),
+            private_key: "private".to_string(),
+            public_key: key.to_string(),
+            created_at: 0,
+            extra: extra.as_object().cloned().unwrap_or_default(),
+        }
+    }
+
     fn joined(rules: &[Vec<String>]) -> Vec<String> {
         rules.iter().map(|rule| rule.join(" ")).collect()
     }
 
-    #[test]
-    fn local_services_may_reach_peers_by_default() {
-        let rules = joined(&service(true).tunnel_policy("eth0"));
-        // Peers cannot reach each other or the internet through these rules, and
-        // the internet cannot enter the tunnel, before local traffic is accepted.
-        let position = |needle: &str| rules.iter().position(|rule| rule == needle).expect(needle);
-        assert!(position("-i wg0 -o wg0 -j DROP") < position("-o wg0 -j ACCEPT"));
-        assert!(position("-i eth0 -o wg0 -j DROP") < position("-o wg0 -j ACCEPT"));
-        // Replies from peers are accepted but new connections from them are not.
-        assert!(rules
-            .contains(&"-i wg0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT".to_string()));
-        assert!(
-            position("-i wg0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT")
-                < position("-i wg0 -j DROP")
-        );
-        assert_eq!(rules.last().map(String::as_str), Some("-o wg0 -j ACCEPT"));
+    fn position(rules: &[String], needle: &str) -> usize {
+        rules.iter().position(|rule| rule == needle).expect(needle)
     }
 
     #[test]
-    fn switching_it_off_drops_everything_into_and_out_of_the_tunnel() {
-        let rules = joined(&service(false).tunnel_policy("eth0"));
-        assert_eq!(
-            rules,
-            vec!["-i wg0 -j DROP".to_string(), "-o wg0 -j DROP".to_string()]
+    fn local_services_may_reach_peers_and_their_routes_by_default() {
+        let clients = vec![
+            peer(
+                "home",
+                "k1",
+                "10.8.0.2",
+                json!({"advertised_routes": ["192.168.1.0/24"]}),
+            ),
+            peer("phone", "k2", "10.8.0.3", json!({})),
+        ];
+        let rules = joined(&service(true).tunnel_policy("eth0", &clients));
+        let allow_home = position(&rules, "-o wg0 -d 10.8.0.2/32 -j ACCEPT");
+        let allow_route = position(&rules, "-o wg0 -d 192.168.1.0/24 -j ACCEPT");
+        let allow_phone = position(&rules, "-o wg0 -d 10.8.0.3/32 -j ACCEPT");
+        // Peers cannot reach each other or the internet through these rules, and the
+        // internet cannot enter the tunnel, before any local traffic is accepted.
+        assert!(position(&rules, "-i wg0 -o wg0 -j DROP") < allow_home);
+        assert!(position(&rules, "-i eth0 -o wg0 -j DROP") < allow_home);
+        assert!(allow_home < allow_route && allow_route < allow_phone);
+        // Replies from peers are accepted but new connections from them are not.
+        let replies = position(
+            &rules,
+            "-i wg0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT",
         );
+        assert!(replies < position(&rules, "-i wg0 -j DROP"));
+        assert_eq!(rules.last().map(String::as_str), Some("-o wg0 -j DROP"));
+    }
+
+    #[test]
+    fn a_peer_can_opt_out_of_server_access() {
+        let clients = vec![
+            peer("home", "k1", "10.8.0.2", json!({})),
+            peer(
+                "private",
+                "k2",
+                "10.8.0.3",
+                json!({"local_access": false, "advertised_routes": ["10.99.0.0/24"]}),
+            ),
+        ];
+        let rules = joined(&service(true).tunnel_policy("eth0", &clients));
+        assert!(rules.contains(&"-o wg0 -d 10.8.0.2/32 -j ACCEPT".to_string()));
+        assert!(!rules
+            .iter()
+            .any(|rule| rule.contains("10.8.0.3") || rule.contains("10.99.0.0")));
+    }
+
+    #[test]
+    fn the_server_wide_setting_is_only_a_default() {
+        let clients = vec![
+            peer("home", "k1", "10.8.0.2", json!({})),
+            peer(
+                "proxy-target",
+                "k2",
+                "10.8.0.3",
+                json!({"local_access": true}),
+            ),
+        ];
+        let rules = joined(&service(false).tunnel_policy("eth0", &clients));
+        assert!(!rules.iter().any(|rule| rule.contains("10.8.0.2")));
+        assert!(rules.contains(&"-o wg0 -d 10.8.0.3/32 -j ACCEPT".to_string()));
+        // With no peer allowed, everything into the tunnel is dropped.
+        let none = joined(&service(false).tunnel_policy("eth0", &clients[..1]));
+        assert!(none
+            .iter()
+            .all(|rule| !rule.contains("ACCEPT") || rule.contains("RELATED,ESTABLISHED")));
+        assert_eq!(none.last().map(String::as_str), Some("-o wg0 -j DROP"));
     }
 }

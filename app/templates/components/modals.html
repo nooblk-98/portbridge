@@ -398,6 +398,19 @@
                 <input id="peer-split-tunnel" type="checkbox" switch role="switch" class="pb-switch"
                     x-model="forms.options.split_tunnel" aria-describedby="peer-split-help">
             </div>
+            <div class="pb-setting">
+                <div class="pb-setting__text">
+                    <label for="peer-local-access" class="pb-label">Server access</label>
+                    <p id="peer-local-access-help" class="pb-hint pb-hint--tight">
+                        <strong>On:</strong> programs on this server, such as a Docker reverse proxy or
+                        <code>curl</code>, can open connections to this peer and the networks it advertises.
+                        <strong>Off:</strong> only other peers (through route access) and forwarded public
+                        ports can reach it. This does not change the device's profile.
+                    </p>
+                </div>
+                <input id="peer-local-access" type="checkbox" switch role="switch" class="pb-switch"
+                    x-model="forms.options.local_access" aria-describedby="peer-local-access-help">
+            </div>
         </div>
 
         <div class="pb-section">

@@ -112,6 +112,9 @@ pub struct PeerOptions {
     pub dns: String,
     pub mtu: Option<i64>,
     pub keepalive: i64,
+    /// Whether programs on the server may open connections to this peer.
+    /// `None` follows the server-wide default.
+    pub local_access: Option<bool>,
 }
 
 impl Default for PeerOptions {
@@ -124,6 +127,7 @@ impl Default for PeerOptions {
             dns: DEFAULT_DNS.to_string(),
             mtu: None,
             keepalive: DEFAULT_KEEPALIVE,
+            local_access: None,
         }
     }
 }
@@ -161,6 +165,7 @@ impl PeerOptions {
             .get("keepalive")
             .and_then(Value::as_i64)
             .unwrap_or(DEFAULT_KEEPALIVE);
+        let local_access = extra.get("local_access").and_then(Value::as_bool);
         Self {
             advertised_routes,
             route_access,
@@ -168,6 +173,7 @@ impl PeerOptions {
             dns,
             mtu,
             keepalive,
+            local_access,
         }
     }
 
@@ -185,6 +191,9 @@ impl PeerOptions {
             self.mtu.map(Value::from).unwrap_or(Value::Null),
         );
         map.insert("keepalive".to_string(), Value::from(self.keepalive));
+        if let Some(value) = self.local_access {
+            map.insert("local_access".to_string(), Value::Bool(value));
+        }
         map
     }
 
@@ -215,6 +224,7 @@ pub struct PeerSettings {
     pub dns: String,
     pub mtu: Option<i64>,
     pub keepalive: i64,
+    pub local_access: Option<bool>,
 }
 
 impl PeerSettings {
@@ -232,6 +242,9 @@ impl PeerSettings {
             self.mtu.map(Value::from).unwrap_or(Value::Null),
         );
         map.insert("keepalive".to_string(), Value::from(self.keepalive));
+        if let Some(value) = self.local_access {
+            map.insert("local_access".to_string(), Value::Bool(value));
+        }
         map
     }
 
@@ -518,13 +531,14 @@ pub fn validate_options(
     clients: &[Client],
     network: Ipv4Net,
 ) -> Result<PeerSettings, String> {
-    const ALLOWED: [&str; 6] = [
+    const ALLOWED: [&str; 7] = [
         "advertised_routes",
         "route_access",
         "split_tunnel",
         "dns",
         "mtu",
         "keepalive",
+        "local_access",
     ];
     if raw.keys().any(|key| !ALLOWED.contains(&key.as_str())) {
         return Err("Invalid peer options.".to_string());
@@ -592,6 +606,12 @@ pub fn validate_options(
         .and_then(Value::as_bool)
         .ok_or_else(|| "Split tunnel must be enabled or disabled.".to_string())?;
 
+    let local_access = match merged.get("local_access") {
+        None | Some(Value::Null) => None,
+        Some(Value::Bool(value)) => Some(*value),
+        Some(_) => return Err("Server access must be on or off.".to_string()),
+    };
+
     let dns_text = merged
         .get("dns")
         .and_then(Value::as_str)
@@ -639,6 +659,7 @@ pub fn validate_options(
         dns,
         mtu,
         keepalive,
+        local_access,
     })
 }
 
@@ -671,6 +692,16 @@ mod tests {
         assert!(!PeerOptions::from_extra(&extra).split_tunnel);
         extra.insert("split_tunnel".to_string(), Value::Bool(true));
         assert!(PeerOptions::from_extra(&extra).split_tunnel);
+    }
+
+    #[test]
+    fn server_access_follows_the_default_until_a_peer_sets_it() {
+        assert_eq!(PeerOptions::from_extra(&Map::new()).local_access, None);
+        let mut extra = Map::new();
+        extra.insert("local_access".to_string(), Value::Bool(false));
+        assert_eq!(PeerOptions::from_extra(&extra).local_access, Some(false));
+        // An unset value is not written back, so it keeps following the default.
+        assert!(!PeerOptions::default().as_map().contains_key("local_access"));
     }
 
     #[test]

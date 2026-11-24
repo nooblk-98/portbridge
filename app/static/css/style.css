@@ -662,6 +662,10 @@
     background: var(--pb-surface-muted);
 }
 
+.pb-setting + .pb-setting {
+    margin-top: 0.75rem;
+}
+
 .pb-setting__text {
     min-width: 0;
 }

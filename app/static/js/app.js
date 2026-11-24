@@ -123,6 +123,30 @@ function app() {
             });
         },
 
+        /** Allow or block programs on the server (such as a Docker reverse proxy) from reaching a peer. */
+        async toggleLocalAccess(client, event) {
+            const input = event.target;
+            const enabled = input.checked;
+            input.disabled = true;
+            try {
+                await fetch(`/api/clients/${encodeURIComponent(client.name)}/options`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ local_access: enabled }),
+                }).then(this.checkAuth);
+                this.showToast(enabled
+                    ? `Server access on for ${client.name}. Programs on this server can reach it.`
+                    : `Server access off for ${client.name}. Programs on this server can no longer reach it.`);
+                await this.loadData();
+            } catch (error) {
+                input.checked = !enabled;
+                const details = error instanceof Response ? await error.json().catch(() => null) : null;
+                this.showToast(details?.description || 'Could not change server access', 'error');
+            } finally {
+                input.disabled = false;
+            }
+        },
+
         /** Tooltips open on hover and focus; Escape dismisses them without moving focus. */
         setupTooltips() {
             document.addEventListener('keydown', event => {

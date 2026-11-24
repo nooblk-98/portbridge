@@ -5,6 +5,21 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.3.0] - 2026-11-24
+
+### Added
+
+- **A Server access switch for each peer**, on its card and in its settings,
+  with the same round switch and hover explanation as Split tunnel. It controls
+  whether programs on the server, such as a Docker reverse proxy or `curl`, can
+  open connections to that peer and the networks it advertises.
+
+### Changed
+
+- `ALLOW_LOCAL_TO_PEERS` is now the default for peers that have no setting of
+  their own, and the firewall rules are written per peer instead of for the
+  whole tunnel. Existing peers keep following the default, which is on.
+
 ## [1.2.5] - 2026-11-24
 
 ### Fixed
@@ -177,6 +192,7 @@ First release of the Rust version of PortBridge: a WireGuard server with a web
 dashboard, per-peer routes with access rules, and public TCP and UDP port
 forwarding.
 
+[1.3.0]: https://github.com/nooblk-98/portbridge/compare/v1.2.5...v1.3.0
 [1.2.5]: https://github.com/nooblk-98/portbridge/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/nooblk-98/portbridge/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/nooblk-98/portbridge/compare/v1.2.2...v1.2.3
