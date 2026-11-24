@@ -5,6 +5,14 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.3.2] - 2026-11-24
+
+### Changed
+
+- The Server access explanations, toasts and docs now say what it does: the
+  PortBridge server, and programs running on it such as a Docker reverse proxy or
+  `curl`, can connect to the services running on a peer.
+
 ## [1.3.1] - 2026-11-24
 
 ### Changed
@@ -204,6 +212,7 @@ First release of the Rust version of PortBridge: a WireGuard server with a web
 dashboard, per-peer routes with access rules, and public TCP and UDP port
 forwarding.
 
+[1.3.2]: https://github.com/nooblk-98/portbridge/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/nooblk-98/portbridge/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/nooblk-98/portbridge/compare/v1.2.5...v1.3.0
 [1.2.5]: https://github.com/nooblk-98/portbridge/compare/v1.2.4...v1.2.5

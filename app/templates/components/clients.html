@@ -127,8 +127,8 @@
                         @change="toggleLocalAccess(client, $event)">
                     <span role="tooltip" class="pb-tip__bubble" :id="'local-tip-' + client.public_key">
                         <strong>Server access</strong>
-                        <span>On: programs on the PortBridge hosted server, such as a Docker reverse proxy or curl, can open connections to this peer and the networks it advertises.</span>
-                        <span>Off (the default): only other peers (through route access) and forwarded public ports can reach it. No profile change is needed.</span>
+                        <span>On: the PortBridge server, and programs running on it such as a Docker reverse proxy or curl, can connect to the services running on this peer and the networks it advertises.</span>
+                        <span>Off (the default): only other peers (through route access) and forwarded public ports can reach this peer's services. No profile change is needed.</span>
                     </span>
                 </div>
 
