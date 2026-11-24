@@ -76,3 +76,19 @@ To prove a styling change did not alter how anything looks, compare screenshots
 VISUAL=1 npx playwright test visual --update-snapshots   # on the old code
 VISUAL=1 npx playwright test visual                      # on the new code
 ```
+
+## README screenshots
+
+The screenshots in `images/screenshots/` are generated from the demo data (the
+same server the browser tests use), so they never show real peers and are easy to
+refresh after a UI change:
+
+```sh
+cd frontend
+npm run screenshots
+```
+
+It builds the demo server, opens each page at 1600 pixels wide, resizes the window
+to fit the whole page, and writes the six images at 2000 pixels wide. The footer
+shows the newest version in `CHANGELOG.md` rather than the development build's
+`0.0.0-dev`.
