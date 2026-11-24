@@ -5,6 +5,30 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.4.1] - 2026-11-24
+
+### Fixed
+
+- **Mobile controls.** The menu button sits on the left, the header stays outside
+  the scrolling content, and the circular logo shows without its square tile on
+  the dashboard and the sign-in screen.
+- **Forwarding rules on mobile.** Each rule is a stacked card, so the target
+  client and the delete button are no longer hidden off-screen.
+- **Invalid forwarding storage no longer wipes your rules.** If the forwarding
+  file cannot be read, listing, adding, removing and applying rules now report
+  the error and leave the file untouched. Peers and routes stay available.
+- **Blank internal port.** Adding a forwarding rule with an empty internal port
+  uses the public port instead of failing.
+
+### Changed
+
+- Loading, empty and error states appear at the right times on every page.
+- The dashboard no longer makes a duplicate summary request, pauses background
+  polling in hidden tabs, and reuses recent traffic history when you switch
+  ranges.
+- Static assets are revalidated, and authenticated pages, API responses and
+  downloads are never cached by the browser.
+
 ## [1.4.0] - 2026-11-24
 
 ### Added

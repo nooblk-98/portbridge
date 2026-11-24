@@ -46,7 +46,7 @@ impl ClientManager {
     fn list_clients_locked(&self) -> Result<Value, AppError> {
         let server_public = self.wg.ensure_server_keys()?.1;
         let clients = self.wg.load_clients()?;
-        let forwardings = self.fwd.list_rules()?;
+        let forwardings = self.fwd.list_rules().ok();
         let status = self.wg.peer_status_map();
         let exports = self.load_profile_exports();
         let acks = self.load_profile_acks();
@@ -54,12 +54,13 @@ impl ClientManager {
         let mut routes = Vec::new();
         let mut profiles = Vec::new();
         for client in &clients {
-            let forwards: Vec<Value> = forwardings
+            let forwards: Vec<_> = forwardings
+                .as_deref()
+                .unwrap_or_default()
                 .iter()
                 .filter(|rule| {
                     rule.get("client_ip").and_then(Value::as_str) == Some(client.address.as_str())
                 })
-                .cloned()
                 .collect();
             let peer_state = status.get(&client.public_key);
             let options = client.options();
@@ -138,6 +139,7 @@ impl ClientManager {
         Ok(json!({
             "server_public_key": server_public,
             "items": items,
+            "forwardings_available": forwardings.is_some(),
             "routes": routes,
             "split_tunnel_profiles": profiles,
         }))
@@ -375,10 +377,10 @@ impl ClientManager {
             .iter()
             .position(|client| client.name == old_name)
             .ok_or_else(|| AppError::not_found("Client not found."))?;
-        if clients
-            .iter()
-            .any(|client| client.name == new_name && client.name != old_name)
-        {
+        if old_name == new_name {
+            return Ok(json!({"name": new_name}));
+        }
+        if clients.iter().any(|client| client.name == new_name) {
             return Err(AppError::validation("Client name already exists."));
         }
         let previous = clients.clone();
@@ -660,5 +662,60 @@ fn validate_name(name: &str) -> Result<(), AppError> {
         Err(AppError::validation(
             "Use 1–64 letters, numbers, dots, underscores or hyphens, starting with a letter or number.",
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runner::FakeRunner;
+    use crate::storage::InMemoryStorage;
+
+    #[test]
+    fn client_data_is_available_when_forwarding_storage_is_invalid() {
+        let config = Arc::new(Config::for_test(std::env::temp_dir()));
+        let storage = Arc::new(InMemoryStorage::new());
+        for key in ["server.privatekey", "server.publickey"] {
+            storage
+                .write_text(config.data_dir.join(key).to_str().unwrap(), "test key")
+                .unwrap();
+        }
+        storage.save_json(config.clients_file.to_str().unwrap(), &json!([{
+            "name": "home", "address": "10.8.0.2", "private_key": "private", "public_key": "public"
+        }])).unwrap();
+        storage
+            .write_text(config.forward_file.to_str().unwrap(), "{ broken")
+            .unwrap();
+        let services = crate::build_services_with(config, storage, Arc::new(FakeRunner::new()));
+
+        let clients = services.client_manager.list_clients().unwrap();
+        assert_eq!(clients["items"][0]["name"], "home");
+        assert_eq!(clients["items"][0]["forwardings"], json!([]));
+        assert_eq!(clients["forwardings_available"], false);
+        assert!(services.forwarding_manager.list_rules().is_err());
+    }
+
+    #[test]
+    fn renaming_a_peer_to_its_current_name_preserves_its_profile() {
+        let config = Arc::new(Config::for_test(std::env::temp_dir()));
+        let storage = Arc::new(InMemoryStorage::new());
+        let runner = Arc::new(FakeRunner::new());
+        let services = crate::build_services_with(config.clone(), storage.clone(), runner.clone());
+        storage.save_json(config.clients_file.to_str().unwrap(), &json!([{
+            "name": "home", "address": "10.8.0.2", "private_key": "private", "public_key": "public"
+        }])).unwrap();
+        let profile = config.clients_dir.join("home.conf");
+        storage
+            .write_text(profile.to_str().unwrap(), "existing profile")
+            .unwrap();
+
+        let manager = &services.client_manager;
+        assert_eq!(
+            manager.rename_client("home", "home").unwrap(),
+            json!({"name": "home"})
+        );
+        assert_eq!(manager.read_config("home").unwrap(), "existing profile");
+        assert!(manager.rename_client("missing", "missing").is_err());
+        assert!(runner.commands().is_empty());
     }
 }

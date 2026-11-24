@@ -373,16 +373,24 @@
     list-style: none;
     margin: 0;
     padding: 0.5rem 1.25rem 1.25rem;
+    container-type: inline-size;
 }
 
 .pb-list__row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
+    display: grid;
+    justify-items: start;
+    gap: 0.375rem;
+    overflow-wrap: anywhere;
     padding: 0.75rem 0;
     border-bottom: 1px solid var(--pb-border);
+}
+
+@container (min-width: 24rem) {
+    .pb-list__row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        column-gap: 1rem;
+    }
 }
 
 .pb-list__row:last-child {
@@ -1744,4 +1752,45 @@
 
 .dark .pb-notice__btn--primary:hover {
     background: #f59e0b;
+}
+
+/* Forwarding rules: stack each rule as a card on narrow screens so the
+   target client and delete button are never hidden off-screen. */
+@media (max-width: 767px) {
+    .pb-fwd-table thead {
+        display: none;
+    }
+
+    .pb-fwd-table,
+    .pb-fwd-table tbody {
+        display: block;
+        width: 100%;
+    }
+
+    .pb-fwd-table tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 1rem;
+        padding: 1rem;
+    }
+
+    .pb-fwd-table td {
+        padding: 0 !important;
+    }
+
+    .pb-fwd-table td.pb-fwd-target {
+        flex-basis: 100%;
+        order: 3;
+    }
+
+    .pb-fwd-table td.pb-fwd-actions {
+        margin-left: auto;
+        order: 2;
+    }
+
+    .pb-fwd-table td[colspan] {
+        flex-basis: 100%;
+        padding: 1.5rem 0 !important;
+    }
 }

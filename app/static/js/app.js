@@ -6,6 +6,7 @@ const PAGES = [
     { id: 'routes', label: 'Routes', icon: 'route', path: '/routes' },
     { id: 'forwarding', label: 'Forwarding', icon: 'alt_route', path: '/forwarding' }
 ];
+const HISTORY_CACHE_MS = 30000;
 
 function pageForPath(pathname) {
     const clean = pathname.replace(/\/+$/, '') || '/';
@@ -20,10 +21,13 @@ function app() {
         currentTab: pageForPath(window.location.pathname),
         mobileMenuOpen: false,
         isDarkMode: window.PortBridgeTheme.isDark(),
-        state: {},
         stats: null,
+        statsError: '',
         history: null,
+        historyError: '',
+        historyCache: {},
         historyRange: '1h',
+        historyRequestId: 0,
         historyRanges: [
             { id: '1h', label: '1 h' },
             { id: '24h', label: '24 h' },
@@ -31,7 +35,14 @@ function app() {
         ],
         statsTick: 0,
         clients: [],
+        clientsReady: false,
+        clientsError: '',
+        clientForwardingsAvailable: true,
         forwardings: [],
+        forwardingsReady: false,
+        forwardingError: '',
+        dataRequestId: 0,
+        dataRefreshing: false,
         routes: [],
         routeRows: [],
         restrictedRouteCount: 0,
@@ -69,6 +80,7 @@ function app() {
         pendingDelete: { type: null, name: null, port: null, proto: null },
 
         loading: {
+            logout: false,
             createClient: false,
             createFwd: false,
             options: false,
@@ -107,8 +119,20 @@ function app() {
             showPage(this.currentTab);
             this.setupTooltips();
 
-            this.loadData();
-            setInterval(() => this.loadData(), 30000);
+            const refreshData = () => {
+                if (!document.hidden && !this.dataRefreshing) this.loadData();
+            };
+            refreshData();
+            setInterval(refreshData, 30000);
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) return;
+                refreshData();
+                if (this.currentTab === 'dashboard') {
+                    this.loadStats();
+                    this.loadHistory();
+                    this.statsTick = 0;
+                }
+            });
             // Live numbers every 10 seconds while the dashboard is visible; the
             // chart refreshes about once a minute, like the server samples.
             setInterval(() => {
@@ -347,25 +371,43 @@ function app() {
             try {
                 const response = await fetch('/api/stats').then(this.checkAuth);
                 this.stats = await response.json();
+                this.statsError = '';
             } catch (error) {
-                // Keep showing the last numbers; the next poll retries.
+                if (error.status !== 401) this.statsError = 'Could not refresh live statistics.';
             }
         },
 
         async loadHistory() {
+            const requestId = ++this.historyRequestId;
+            const range = this.historyRange;
             try {
-                const response = await fetch(`/api/stats/history?range=${encodeURIComponent(this.historyRange)}`).then(this.checkAuth);
-                this.history = await response.json();
+                const response = await fetch(`/api/stats/history?range=${encodeURIComponent(range)}`).then(this.checkAuth);
+                const history = await response.json();
+                if (requestId !== this.historyRequestId) return;
+                this.historyCache[range] = { history, fetchedAt: Date.now() };
+                this.history = history;
+                this.historyError = '';
                 this.renderTrafficChart();
             } catch (error) {
-                // Keep the previous chart.
+                if (requestId === this.historyRequestId && error.status !== 401) {
+                    this.historyError = 'Could not refresh traffic history.';
+                }
             }
         },
 
         setHistoryRange(range) {
             if (this.historyRange === range) return;
             this.historyRange = range;
-            this.loadHistory();
+            this.historyError = '';
+            const cached = this.historyCache[range];
+            if (cached && Date.now() - cached.fetchedAt < HISTORY_CACHE_MS) {
+                ++this.historyRequestId;
+                this.history = cached.history;
+                this.renderTrafficChart();
+            } else {
+                this.history = null;
+                this.loadHistory();
+            }
         },
 
         chartLabel(timestamp) {
@@ -444,11 +486,16 @@ function app() {
         },
 
         async logout() {
+            if (this.loading.logout) return;
+            this.loading.logout = true;
             try {
-                await fetch('/auth/logout', { method: 'POST' });
+                const response = await fetch('/auth/logout', { method: 'POST' });
+                if (!response.ok && response.status !== 401) throw response;
                 window.location.href = '/login';
-            } catch (e) {
-                window.location.reload();
+            } catch (error) {
+                this.showToast('Could not sign out. Please try again.', 'error');
+            } finally {
+                this.loading.logout = false;
             }
         },
 
@@ -462,16 +509,22 @@ function app() {
         },
 
         async loadData() {
+            const requestId = ++this.dataRequestId;
+            this.dataRefreshing = true;
             try {
-                const [stateRes, clientsRes, fwdRes] = await Promise.all([
-                    fetch('/api/state').then(this.checkAuth),
-                    fetch('/api/clients').then(this.checkAuth),
-                    fetch('/api/forwardings').then(this.checkAuth)
-                ]);
+                await Promise.all([this.loadClients(requestId), this.loadForwardings(requestId)]);
+            } finally {
+                if (requestId === this.dataRequestId) this.dataRefreshing = false;
+            }
+        },
 
-                this.state = await stateRes.json();
+        async loadClients(requestId) {
+            try {
+                const clientsRes = await fetch('/api/clients').then(this.checkAuth);
                 const clientsData = await clientsRes.json();
+                if (requestId !== this.dataRequestId) return;
                 this.clients = Array.isArray(clientsData.items) ? clientsData.items : [];
+                this.clientForwardingsAvailable = clientsData.forwardings_available !== false;
                 this.routes = Array.isArray(clientsData.routes) ? clientsData.routes : [];
                 this.routesAvailable = Array.isArray(clientsData.routes);
                 this.splitTunnelProfiles = Array.isArray(clientsData.split_tunnel_profiles)
@@ -479,11 +532,29 @@ function app() {
                     : [];
                 this.splitTunnelProfilesAvailable = Array.isArray(clientsData.split_tunnel_profiles);
                 this.buildRouteView();
-                const fwdData = await fwdRes.json();
-                this.forwardings = fwdData.items;
-            } catch (err) {
-                if (err.status === 401) return;
-                console.error('Failed to load data', err);
+                this.clientsReady = true;
+                this.clientsError = '';
+            } catch (error) {
+                if (requestId === this.dataRequestId && error.status !== 401) {
+                    this.clientsError = 'Could not refresh clients and routes.';
+                }
+            }
+        },
+
+        async loadForwardings(requestId) {
+            try {
+                const response = await fetch('/api/forwardings').then(this.checkAuth);
+                const data = await response.json();
+                if (requestId !== this.dataRequestId) return;
+                this.forwardings = data.items;
+                this.forwardingsReady = true;
+                this.forwardingError = '';
+            } catch (error) {
+                if (error.status === 401) return;
+                const details = error instanceof Response ? await error.json().catch(() => null) : null;
+                if (requestId === this.dataRequestId) {
+                    this.forwardingError = details?.description || 'Could not load forwarding rules.';
+                }
             }
         },
 

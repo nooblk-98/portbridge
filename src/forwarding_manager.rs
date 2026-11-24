@@ -26,7 +26,7 @@ impl ForwardingManager {
     }
 
     pub fn list_rules(&self) -> Result<Vec<Value>, AppError> {
-        let rules = self.ipt.load_forwardings(None);
+        let rules = self.ipt.load_forwardings()?;
         let owners = self.owners()?;
         Ok(rules
             .into_iter()
@@ -115,17 +115,14 @@ impl ForwardingManager {
             _ => None,
         };
 
-        let target_port_value = data
-            .get("target_port")
-            .filter(|value| !value.is_null())
-            .cloned()
-            .unwrap_or_else(|| port.clone());
-        let target_text = match target_port_value {
-            Value::Number(number) => number.to_string(),
-            Value::String(text) => text,
+        let target_port = match data.get("target_port").filter(|value| {
+            !value.is_null() && !value.as_str().is_some_and(|text| text.trim().is_empty())
+        }) {
+            None => port.as_u64().map(|value| value as u16),
+            Some(Value::Number(number)) => Some(parse_port(&number.to_string())?),
+            Some(Value::String(text)) => Some(parse_port(text.trim())?),
             _ => return Err(AppError::validation("target_port must be numeric.")),
         };
-        let target_port = parse_port(&target_text)?;
 
         if !self.config.wg_network.contains(&client_ip) {
             return Err(AppError::validation("client_ip outside WireGuard network."));
@@ -181,7 +178,7 @@ impl ForwardingManager {
             }
         }
 
-        let previous = self.ipt.load_forwardings(None);
+        let previous = self.ipt.load_forwardings()?;
         let mut rules = previous.clone();
         rules.retain(|rule| {
             let same_port = rule
@@ -215,7 +212,7 @@ impl ForwardingManager {
 
     pub fn remove_rule(&self, port: &str, protocol: &str) -> Result<Value, AppError> {
         let protocol = protocol.to_lowercase();
-        let previous = self.ipt.load_forwardings(None);
+        let previous = self.ipt.load_forwardings()?;
         let mut updated = Vec::new();
         let mut removed = false;
         for rule in &previous {
@@ -243,7 +240,7 @@ impl ForwardingManager {
     }
 
     pub fn seed_if_empty(&self, default_client_ip: &str) -> Result<(), AppError> {
-        let rules = self.ipt.load_forwardings(None);
+        let rules = self.ipt.load_forwardings()?;
         if !rules.is_empty() {
             return Ok(());
         }
@@ -264,7 +261,7 @@ impl ForwardingManager {
     }
 
     pub fn apply_all(&self) -> Result<(), AppError> {
-        let rules = self.ipt.load_forwardings(None);
+        let rules = self.ipt.load_forwardings()?;
         self.ipt.apply_forwardings(&rules)
     }
 
@@ -300,5 +297,62 @@ fn port_string(value: &Value) -> String {
     match value {
         Value::String(text) => text.clone(),
         other => other.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runner::FakeRunner;
+    use crate::storage::InMemoryStorage;
+
+    #[test]
+    fn forwarding_operations_preserve_an_invalid_rules_file() {
+        let config = Arc::new(Config::for_test(std::env::temp_dir()));
+        let storage = Arc::new(InMemoryStorage::new());
+        let services = crate::build_services_with(
+            config.clone(),
+            storage.clone(),
+            Arc::new(FakeRunner::new()),
+        );
+        let manager = &services.forwarding_manager;
+        let path = config.forward_file.to_str().unwrap();
+        assert!(manager.list_rules().unwrap().is_empty());
+        assert!(!storage.exists(path));
+
+        for invalid in ["{ broken", "{}"] {
+            storage.write_text(path, invalid).unwrap();
+            assert!(manager.list_rules().is_err());
+            assert!(manager.remove_rule("30000", "tcp").is_err());
+            assert!(manager.seed_if_empty("10.8.0.2").is_err());
+            assert!(manager.apply_all().is_err());
+            assert_eq!(storage.read_text(path).as_deref(), Some(invalid));
+        }
+    }
+
+    #[test]
+    fn add_forwarding_accepts_blank_and_explicit_internal_ports() {
+        let config = Arc::new(Config::for_test(std::env::temp_dir()));
+        let storage = Arc::new(InMemoryStorage::new());
+        let services = crate::build_services_with(
+            config.clone(),
+            storage.clone(),
+            Arc::new(FakeRunner::new()),
+        );
+        storage.save_json(config.clients_file.to_str().unwrap(), &json!([{
+            "name": "home", "address": "10.8.0.2", "private_key": "private", "public_key": "public"
+        }])).unwrap();
+        let manager = &services.forwarding_manager;
+
+        for (public, internal, expected) in [
+            (json!(8000), json!(""), json!(8000)),
+            (json!("8001-8002"), json!(""), Value::Null),
+            (json!("8003-8004"), json!(8080), json!(8080)),
+        ] {
+            let data = json!({"port": public, "target_port": internal, "client_ip": "10.8.0.2"});
+            let rule = manager.add_rule(data.as_object().unwrap()).unwrap();
+            assert_eq!(rule["target_port"], expected);
+        }
+        assert_eq!(manager.list_rules().unwrap().len(), 3);
     }
 }

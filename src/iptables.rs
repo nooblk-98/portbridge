@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use ipnet::Ipv4Net;
 use regex::Regex;
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use crate::config::Config;
 use crate::error::AppError;
@@ -427,28 +427,17 @@ impl IPTablesService {
         Ok(())
     }
 
-    pub fn load_forwardings(&self, default_client_ip: Option<&str>) -> Vec<Value> {
+    pub fn load_forwardings(&self) -> Result<Vec<Value>, AppError> {
         let path = self.config.forward_file.to_string_lossy();
-        let payload = self.storage.load_json(&path, Value::Null);
-        if let Value::Array(items) = payload {
-            return items;
+        if !self.storage.exists(&path) {
+            return Ok(Vec::new());
         }
-        if let Some(client_ip) = default_client_ip {
-            let seed = vec![json!({
-                "port": 30000,
-                "protocol": "both",
-                "client_ip": client_ip,
-                "target_port": 8080,
-            })];
-            if let Err(error) = self.storage.save_json(&path, &Value::Array(seed.clone())) {
-                tracing::error!("Could not save the default forwarding rule: {error}");
-            }
-            return seed;
-        }
-        if let Err(error) = self.storage.save_json(&path, &json!([])) {
-            tracing::error!("Could not save the empty forwarding list: {error}");
-        }
-        Vec::new()
+        let text = self
+            .storage
+            .read_text(&path)
+            .ok_or_else(|| AppError::runtime("Unable to read the forwarding rules file."))?;
+        serde_json::from_str(&text)
+            .map_err(|error| AppError::runtime(format!("Invalid forwarding rules file: {error}")))
     }
 }
 

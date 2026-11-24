@@ -12,6 +12,9 @@
         </button>
     </header>
 
+    <p x-show="!clientsReady && !clientsError" role="status" class="pb-hint">Loading clients…</p>
+    <p x-show="clientsError" role="alert" class="pb-hint" x-text="clientsError"></p>
+
     <!-- Search -->
     <div class="mb-6">
         <div class="relative max-w-md">
@@ -155,7 +158,9 @@
                                 <span class="ml-1 opacity-75" x-text="'(' + fwd.protocol.toUpperCase() + ')'"></span>
                             </span>
                         </template>
-                        <span x-show="!client.forwardings || client.forwardings.length === 0"
+                        <span x-show="!clientForwardingsAvailable"
+                            class="text-xs text-slate-400 italic">Forwarding details unavailable</span>
+                        <span x-show="clientForwardingsAvailable && !client.forwardings?.length"
                             class="text-xs text-slate-400 italic">No active rules</span>
                     </div>
                 </div>
@@ -164,7 +169,7 @@
     </div>
 
     <!-- Empty State -->
-    <div x-show="filteredClients.length === 0" class="col-span-full py-12 text-center">
+    <div x-show="clientsReady && !clientsError && filteredClients.length === 0" class="col-span-full py-12 text-center">
         <div class="w-16 h-16 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
             <span class="material-symbols-rounded text-3xl text-slate-400">search_off</span>
         </div>

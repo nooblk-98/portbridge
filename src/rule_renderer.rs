@@ -30,9 +30,6 @@ pub fn parse_ipv4_network_lenient(value: &str) -> Option<Ipv4Net> {
 
 struct ParsedRule {
     protocol: String,
-    is_range: bool,
-    start_port: u16,
-    end_port: u16,
     dport_arg: String,
     client_ip: Ipv4Addr,
     target_port: Option<u16>,
@@ -54,7 +51,7 @@ fn parse_rule(rule: &Value) -> Option<ParsedRule> {
         _ => return None,
     };
     let is_range = port_text.contains('-');
-    let (start_port, end_port, dport_arg) = if is_range {
+    let (start_port, dport_arg) = if is_range {
         let (start, end) = port_text.split_once('-')?;
         if end.contains('-') {
             return None;
@@ -64,10 +61,10 @@ fn parse_rule(rule: &Value) -> Option<ParsedRule> {
         if start >= end {
             return None;
         }
-        (start, end, format!("{start}:{end}"))
+        (start, format!("{start}:{end}"))
     } else {
         let port = parse_port(&port_text)?;
-        (port, port, port.to_string())
+        (port, port.to_string())
     };
     let protocol = object
         .get("protocol")
@@ -117,9 +114,6 @@ fn parse_rule(rule: &Value) -> Option<ParsedRule> {
 
     Some(ParsedRule {
         protocol,
-        is_range,
-        start_port,
-        end_port,
         dport_arg,
         client_ip,
         target_port,
@@ -138,20 +132,13 @@ pub fn render_rule(rule: &Value, ext_iface: &str) -> Vec<IptablesCommand> {
         tracing::error!("Skipping invalid forwarding rule");
         return Vec::new();
     };
-    let (to_dest, dest_port_arg) = if parsed.is_range {
-        (
-            format!(
-                "{}:{}-{}",
-                parsed.client_ip, parsed.start_port, parsed.end_port
-            ),
-            parsed.dport_arg.clone(),
-        )
-    } else {
-        let target_port = parsed.target_port.expect("validated target port");
+    let (to_dest, dest_port_arg) = if let Some(target_port) = parsed.target_port {
         (
             format!("{}:{target_port}", parsed.client_ip),
             target_port.to_string(),
         )
+    } else {
+        (parsed.client_ip.to_string(), parsed.dport_arg.clone())
     };
 
     let protocols: Vec<&str> = if parsed.protocol == "both" {
@@ -264,6 +251,21 @@ mod tests {
         assert!(joined(&render_rule(&ok, "eth0")[0]).contains("--dport 30000:30010"));
         let reversed = json!({"port": "30010-30000", "client_ip": "10.8.0.5"});
         assert!(!rule_is_valid(&reversed));
+    }
+
+    #[test]
+    fn ranges_preserve_public_ports_or_forward_to_the_explicit_target() {
+        let mut rule = json!({"port": "30000-30010", "protocol": "tcp", "client_ip": "10.8.0.5"});
+        let commands = render_rule(&rule, "eth0");
+        assert!(joined(&commands[0]).ends_with("--to-destination 10.8.0.5"));
+        assert!(joined(&commands[1]).contains("--dport 30000:30010"));
+
+        rule["target_port"] = json!(8080);
+        let commands = render_rule(&rule, "eth0");
+        assert!(joined(&commands[0]).ends_with("--to-destination 10.8.0.5:8080"));
+        assert!(
+            joined(&commands[1]).contains("--dport 8080 -m conntrack --ctorigdstport 30000:30010")
+        );
     }
 
     #[test]
