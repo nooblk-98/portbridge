@@ -1,20 +1,60 @@
-# PortBridge
+<div align="center">
+  <img src="images/logo/logo.svg" alt="PortBridge logo" width="120">
 
-PortBridge connects devices behind NAT or CGNAT to a WireGuard server you control. Use **Peer settings** to reach a host or subnet privately over WireGuard. Use **Forwarding** when a service needs to be reachable from the internet on a public TCP or UDP port.
+  # PortBridge
 
-## Install on Debian or Ubuntu without Docker
+  **Reach devices behind NAT or CGNAT through a WireGuard server you control.**
 
-Use a dedicated server with systemd, sudo access, and a public IP address or DNS name. Allow inbound UDP 51820 in your server and provider firewalls.
+  [![Release](https://img.shields.io/github/v/release/nooblk-98/portbridge)](https://github.com/nooblk-98/portbridge/releases)
+  [![Docker image](https://img.shields.io/docker/pulls/lahiru98s/portbridge)](https://hub.docker.com/r/lahiru98s/portbridge)
+  [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+</div>
 
-### Install a prebuilt release (recommended)
+PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptables port forwarding, managed from a web dashboard. Run it on a public VPS to expose services from home labs, Starlink or other connections that cannot accept inbound traffic.
 
-Releases include static binaries for 64-bit x86 (`x86_64`) and 64-bit ARM (`arm64`), the installer, and the dashboard files. You do not need git, Rust, or a compiler. This command pins `v1.0.0`, downloads the archive and its SHA-256 checksum, verifies the archive, extracts it into a private temporary directory, and runs the interactive installer. Replace `vpn.example.com` with your server's public hostname or IP. Find the Linux archives on the [Releases page](https://github.com/nooblk-98/portbridge/releases).
+- **Private access**: share a host or subnet with other peers over WireGuard, with per-route access control.
+- **Public forwarding**: publish a TCP or UDP port on the server and send it to a service on a peer, with optional source IP restrictions.
+- **Easy onboarding**: create peers in the UI, then download the config or scan a QR code.
+- **Hardened by default**: peer internet egress is blocked unless you enable it, and the dashboard listens on localhost.
+
+## Quick start
+
+You need a server with a public IP or DNS name, and UDP 51820 allowed through its firewall and your provider's.
+
+### Docker Compose
+
+Create a `.env` file with your server's address and a strong dashboard password:
+
+```ini
+WG_HOST=vpn.example.com
+ADMIN_PASSWORD=change-me-to-a-long-password
+```
+
+Then start the [published image](docker-compose-live.yml):
+
+```sh
+docker compose -f docker-compose-live.yml up -d
+```
+
+To build from a local checkout instead, run `docker compose up -d --build`.
+
+> [!NOTE]
+> The dashboard is bound to `127.0.0.1:3000` on the server. Reach it from your computer with an SSH tunnel:
+>
+> ```sh
+> ssh -N -L 3000:127.0.0.1:3000 user@vpn.example.com
+> ```
+>
+> Then open <http://localhost:3000>.
+
+### Debian or Ubuntu (no Docker)
+
+Requires systemd and sudo. Releases ship static binaries for `x86_64` and `arm64`, so no Rust toolchain is needed. This command downloads a pinned release, verifies its SHA-256 checksum, and runs the interactive installer. Replace `vpn.example.com` with your server's public hostname or IP.
 
 ```bash
 (
 set -euo pipefail
-# Use a release tag that includes the Linux binary assets.
-release=v1.0.0
+release=v1.0.0   # use a tag from the Releases page
 case "$(uname -m)" in
   x86_64|amd64) arch=x86_64 ;;
   aarch64|arm64) arch=arm64 ;;
@@ -29,21 +69,24 @@ url="https://github.com/nooblk-98/portbridge/releases/download/${release}"
 curl -fsSLO "${url}/${archive}"
 curl -fsSLO "${url}/SHA256SUMS"
 expected=$(awk -v file="$archive" '$2 == file {print $1}' SHA256SUMS)
-if [[ -z $expected ]]; then
-  echo "No checksum published for $archive" >&2
-  exit 1
-fi
+[[ -n $expected ]] || { echo "No checksum published for $archive" >&2; exit 1; }
 printf '%s  %s\n' "$expected" "$archive" | sha256sum -c -
 tar -xzf "$archive"
 sudo bash "${archive%.tar.gz}/install.sh" vpn.example.com
 )
 ```
 
-Install `curl` first with `sudo apt-get install -y curl` if it is missing. The checksum check stops the command if the download is incomplete or does not match the published file. The temporary directory is removed when the command exits.
+The installer prompts for a dashboard password (16–128 letters or numbers), creates the `pb0` WireGuard interface, stores data in `/var/lib/portbridge`, and starts the `portbridge` service. Use the SSH tunnel above to reach the dashboard.
 
-### Build from source
+```sh
+sudo systemctl status portbridge
+sudo journalctl -u portbridge -e
+```
 
-For development, install `build-essential` with apt, then install Rust 1.85 or newer and Cargo through rustup as your regular user.
+<details>
+<summary>Build from source</summary>
+
+Install `build-essential` and Rust 1.85 or newer, then:
 
 ```sh
 git clone https://github.com/nooblk-98/portbridge.git
@@ -52,55 +95,61 @@ cargo build --release --locked --bin portbridge
 sudo PORTBRIDGE_BINARY="$PWD/target/release/portbridge" bash install.sh vpn.example.com
 ```
 
-The installer is for fresh installations and prompts for a dashboard password of 16–128 letters or numbers. It starts the `portbridge` service. It uses the `pb0` WireGuard interface and keeps peer data in `/var/lib/portbridge`. The dashboard listens on localhost. Open an SSH tunnel from your computer, then visit <http://localhost:3000>.
+</details>
 
-```sh
-ssh -N -L 3000:127.0.0.1:3000 user@vpn.example.com
-```
+## Usage
 
-For service status, run `sudo systemctl status portbridge`. For logs, run `sudo journalctl -u portbridge -e`.
+### Connect a device
 
-## Connect a device
-
-1. Sign in to the dashboard and create a peer under **Clients**.
+1. Sign in and create a peer under **Clients**.
 2. Download its WireGuard configuration or scan the QR code with the [WireGuard app](https://www.wireguard.com/install/).
-3. Activate the tunnel. Under **Clients**, check for a recent handshake.
+3. Activate the tunnel and check **Clients** for a recent handshake.
 
-A device can offer services on its own WireGuard IP. Make sure those services listen on the tunnel address and the device firewall allows traffic from the VPN.
-
-## Share a host or subnet privately
+### Share a host or subnet privately
 
 1. Open **Clients → Peer settings** for the device that owns or can reach the host.
-2. Enter an IPv4 address such as `192.168.50.10` to share one host or a CIDR such as `192.168.50.0/24` to share a subnet. Save the settings.
-3. If the destination is behind the advertising device, enable IP forwarding on that device, allow forwarding in its firewall, and add a return route to the WireGuard subnet through that device (or configure source NAT there).
-4. For receiving peers using **Split tunnel**, re-import their updated configuration so the new destination is routed over WireGuard. Then connect to the destination IP and its normal service port.
+2. Enter an IPv4 address (`192.168.50.10`) or CIDR (`192.168.50.0/24`) and save.
+3. If the destination sits behind that device, enable IP forwarding on it, allow forwarding in its firewall, and add a return route to the WireGuard subnet (or use source NAT).
+4. Peers using **Split tunnel** must re-import their updated profile. They can then connect to the destination IP directly.
 
-You can advertise private IPv4 ranges and the shared address block `100.64.0.0/10`. Advertised routes must be distinct and cannot overlap the VPN subnet or existing server routes. Clearing the route list withdraws the advertisement. Route changes briefly reconnect the server tunnel. PortBridge distributes route changes through updated WireGuard profiles. You can also set DNS, MTU and persistent keepalive per peer. Re-import the relevant profile after changing those options.
+You can advertise private IPv4 ranges and `100.64.0.0/10`. Routes must be distinct and cannot overlap the VPN subnet or existing server routes. DNS, MTU and keepalive can also be set per peer.
 
-## Choose who can reach a route
+Open **Routes** and select **Edit access** to choose which peers may use a route. An empty selection blocks every other peer.
 
-Open **Routes** to see the advertised addresses, route owners, recent handshakes, and access rules. Select **Edit access** to allow all peers or select specific peers for a route. Leaving the selected list empty blocks other peers from using that route. This setting applies to the advertised address. Peers can still use each other's WireGuard addresses subject to their device firewalls.
+### Publish a service to the internet
 
-The **Split-tunnel profiles** section shows whether the current profile has been exported. After a route or access change, export and re-import updated profiles when prompted. A recent handshake means the owner connected to WireGuard. Test the destination service from a permitted peer to verify reachability.
+Open **Forwarding**, create a rule, and choose a public port, protocol, target peer and service port. Optionally restrict it to a source IP or CIDR.
 
-## Publish a specific service
+The service sees the original client address, so its replies must return through WireGuard. With a split-tunnel profile, add a return route for the permitted sources, or use a full-tunnel profile. Allow the public port through your firewalls, and for Docker add the port to the Compose `ports` list, for example `"30000:30000/tcp"`.
 
-Open **Forwarding**, create a rule, and select a public port, protocol, target peer and service port. Set a source IP or CIDR to restrict access when needed. The service sees the original connection source. Its replies must return through WireGuard. When using a split-tunnel profile, configure a return route for the permitted public sources or use a full-tunnel profile. Allow the public port through the server and provider firewalls. For Docker, publish the same port and protocol in Compose.
+### Internet access through the VPN
 
-## Run with Docker Compose
+Peer internet access is blocked by default. To use the server as a gateway, set `ALLOW_INTERNET_EGRESS=1` in `/etc/portbridge/portbridge.env` (or the Compose service environment) and restart. Devices with full-tunnel profiles will then route IPv4 internet traffic through the server.
 
-Set `WG_HOST` to your server's public hostname or IP and `ADMIN_PASSWORD` to a strong password in a local `.env` file. Start the [published image](docker-compose-live.yml) with:
+## Configuration
+
+PortBridge is configured through environment variables.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `ADMIN_PASSWORD` | required | Dashboard password |
+| `WG_HOST` | `127.0.0.1` | Public hostname or IP written into peer configs |
+| `WG_PORT` | `51820` | WireGuard UDP port |
+| `WG_NETWORK` | `10.8.0.0/24` | VPN subnet |
+| `WG_INTERFACE` | `wg0` | WireGuard interface name |
+| `APP_HOST` / `APP_PORT` | `0.0.0.0` / `3000` | Dashboard bind address |
+| `DATA_DIR` | `/data` | Where keys and state are stored |
+| `ALLOW_INTERNET_EGRESS` | unset | Set to `1` to allow peer internet egress |
+
+## Upgrading
+
+Keep the same Compose project name and data volume. If you are upgrading from the earlier Python version, sign in again and recreate legacy public forwards for the intended peers.
+
+## Development
 
 ```sh
-docker compose -f docker-compose-live.yml up -d
+cargo build
+cargo test
 ```
 
-To build from this checkout, run `docker compose up -d --build`. Allow UDP 51820 through your server and provider firewalls. The dashboard is at <http://localhost:3000> on the server. Use the SSH tunnel above for remote access.
-
-For a public forwarding rule, add its port and protocol to the Compose `ports` list. For example, add `"30000:30000/tcp"` for TCP port 30000. Carry over any mappings you still use when upgrading.
-
-Keep the same Compose project name and data volume on upgrade. Sign in again after upgrading from Python, and recreate legacy public forwards for the intended peers.
-
-## Internet access through the VPN
-
-The server blocks general peer internet access by default. For devices that only need VPN services, enable split tunneling. To use the server as an internet gateway, set `ALLOW_INTERNET_EGRESS=1` in `/etc/portbridge/portbridge.env` (or in the Compose service environment) and restart PortBridge. Devices with full-tunnel profiles then send their IPv4 internet traffic through the server.
+See [CONTEXT.md](CONTEXT.md) for the domain language and module overview.
