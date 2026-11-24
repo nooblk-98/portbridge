@@ -22,7 +22,7 @@ test.describe("every page", () => {
       await openPage(page, path, heading);
       await page.waitForLoadState("networkidle");
       await expectNoHorizontalScroll(page);
-      expect(problems).toEqual([]);
+      expect(problems, problems.join("\n")).toEqual([]);
     });
   }
 });
@@ -55,6 +55,22 @@ test.describe("navigation", () => {
         "aria-current",
         "page",
       );
+    }
+  });
+});
+
+test.describe("static files", () => {
+  test("are requested with the release number, so a caching proxy cannot serve stale ones", async ({ page }) => {
+    await openPage(page, "/", "Dashboard");
+    const addresses = await page.evaluate(() =>
+      [...document.querySelectorAll('link[href^="/static/"], script[src^="/static/"], img[src^="/static/"]')].map(
+        node => node.getAttribute("href") || node.getAttribute("src"),
+      ),
+    );
+    expect(addresses.length).toBeGreaterThanOrEqual(8);
+    for (const address of addresses) {
+      expect(address, address).toMatch(/\?v=\d+\.\d+\.\d+$/);
+      expect((await page.request.get(address)).status(), address).toBe(200);
     }
   });
 });

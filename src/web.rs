@@ -73,8 +73,13 @@ pub fn templates(config: &Config) -> Environment<'static> {
                     format!("unknown endpoint {endpoint}"),
                 ));
             }
+            // The release number in the address makes every release a new file for
+            // browsers and caches. A reverse proxy that caches assets for hours
+            // (Nginx Proxy Manager's "Cache Assets") would otherwise keep serving
+            // the old stylesheet and scripts after an upgrade.
             Ok(minijinja::value::Value::from_safe_string(format!(
-                "/static/{filename}"
+                "/static/{filename}?v={}",
+                crate::version()
             )))
         },
     );
@@ -703,6 +708,26 @@ mod footer_tests {
             .render(minijinja::context! {})
             .expect("render");
         assert!(html.contains("<meta name=\"portbridge-update-check\" content=\"on\">"));
+    }
+
+    #[test]
+    fn every_static_file_is_requested_with_the_release_number() {
+        let version = crate::version();
+        for page in ["index.html", "login.html"] {
+            let html = render_page(page);
+            let references: Vec<&str> = html.split("/static/").skip(1).collect();
+            assert!(
+                references.len() >= 5,
+                "{page} should load several static files"
+            );
+            for reference in references {
+                let address = reference.split('"').next().unwrap();
+                assert!(
+                    address.ends_with(&format!("?v={version}")),
+                    "{page}: /static/{address} has no release number"
+                );
+            }
+        }
     }
 
     #[test]

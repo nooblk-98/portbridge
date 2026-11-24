@@ -5,6 +5,17 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.6.1] - 2026-11-24
+
+### Fixed
+
+- **Upgrades no longer show an old stylesheet behind a caching proxy.** A reverse
+  proxy that caches assets for hours (Nginx Proxy Manager's "Cache Assets") kept
+  serving the previous release's CSS and scripts, so new features looked missing
+  after an upgrade. Static files are now requested with the release number
+  (`/static/css/tailwind.css?v=1.6.1`), so each release is a new file to every
+  browser and cache.
+
 ## [1.6.0] - 2026-11-24
 
 ### Added
