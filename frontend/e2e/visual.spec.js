@@ -3,7 +3,7 @@
 //   VISUAL=1 npx playwright test visual --update-snapshots   (on the old code)
 //   VISUAL=1 npx playwright test visual                      (on the new code)
 // Baselines are not committed: font rendering differs between machines.
-const { test, expect } = require("@playwright/test");
+const { test, expect, mockRelease } = require("./fixtures");
 const { isMobile, openPage, clearImportNotices } = require("./helpers");
 
 test.skip(!process.env.VISUAL, "set VISUAL=1 to run the screenshot comparison");
@@ -116,6 +116,19 @@ for (const theme of THEMES) {
       await dialog.getByRole("button", { name: "Save" }).click();
       await expect(dialog).toBeHidden();
       await clearImportNotices(page);
+    });
+
+    test("update available", async ({ page }) => {
+      await mockRelease(page, "1.5.0");
+      await openPage(page, "/", "Dashboard");
+      const notice = page.getByRole("status").filter({ hasText: "is available" });
+      await expect(notice).toBeVisible();
+      await shoot(page, `update-notice-${theme}`);
+      await notice.getByRole("button", { name: "What's new" }).click();
+      await expect(page.getByRole("dialog", { name: /is available/ })).toBeVisible();
+      await shoot(page, `update-dialog-${theme}`);
+      await page.getByRole("tab", { name: "Docker" }).click();
+      await shoot(page, `update-dialog-docker-${theme}`);
     });
 
     test("mobile drawer", async ({ page }) => {

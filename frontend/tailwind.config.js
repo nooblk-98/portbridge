@@ -7,6 +7,7 @@ module.exports = {
     "../app/static/js/login.js",
     "../app/static/js/route-access.js",
     "../app/static/js/tones.js",
+    "../app/static/js/updates.js",
     "../app/static/js/theme.js",
   ],
   // theme.js toggles the `dark` class on <html>.

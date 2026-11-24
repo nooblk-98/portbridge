@@ -1,0 +1,29 @@
+{% from "components/ui.html" import ui %}
+{% set action = "inline-flex cursor-pointer items-center gap-1 rounded-[0.625rem] border px-3 py-[0.35rem] text-[0.8rem] font-semibold leading-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-focus" %}
+<!-- A newer release is available. The popup has the changelog and the upgrade command. -->
+<section x-show="updateRelease" x-cloak role="status" aria-live="polite" aria-labelledby="update-notice-title"
+    class="mb-6 flex items-start gap-3.5 rounded-2xl border border-primary-200 bg-primary-50 px-5 py-4 text-primary-900 dark:border-primary-800 dark:bg-primary-950 dark:text-primary-100">
+    <span class="material-symbols-rounded flex-none text-[1.5rem] leading-6 text-primary-600 dark:text-primary-400"
+        aria-hidden="true">new_releases</span>
+    <div class="min-w-0 flex-1">
+        <h2 id="update-notice-title" class="m-0 text-[0.95rem] font-bold leading-normal"
+            x-text="'PortBridge v' + (updateRelease?.version || '') + ' is available'"></h2>
+        <p class="mb-3 mt-1 text-[0.85rem] leading-[1.45]"
+            x-text="'You are running v' + currentVersion + '. See what changed and how to upgrade.'"></p>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" @click="openUpdate()"
+                class="{{ action }} border-primary-700 bg-primary-700 text-white hover:bg-primary-800 dark:border-primary-500 dark:bg-primary-500 dark:text-primary-950 dark:hover:bg-primary-400">
+                <span class="material-symbols-rounded text-[1.05rem]" aria-hidden="true">article</span>
+                What's new
+            </button>
+            <button type="button" @click="remindLater()"
+                class="{{ action }} border-primary-600 bg-transparent hover:bg-primary-600/[0.12] dark:border-primary-700">
+                Remind me later
+            </button>
+            <button type="button" @click="ignoreUpdate()"
+                class="{{ action }} border-transparent bg-transparent hover:bg-primary-600/[0.12]">
+                Ignore this version
+            </button>
+        </div>
+    </div>
+</section>

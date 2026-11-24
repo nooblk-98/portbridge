@@ -5,6 +5,24 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.5.0] - 2026-11-24
+
+### Added
+
+- **An "update available" notice.** When a newer release exists, the dashboard
+  shows a banner with **What's new**, **Remind me later** and **Ignore this
+  version**. What's new opens a popup with the release's changelog and the
+  upgrade command to copy (the `install.sh --upgrade` line for Debian and Ubuntu,
+  or the Compose pull and recreate for Docker). Remind me later hides it for a
+  day; Ignore hides that version until a newer one appears. Nothing upgrades by
+  itself, so you stay in control.
+
+  Your browser asks GitHub's public releases API at most every six hours and
+  sends nothing about your installation, and the page's security policy allows
+  that one address only when the check is on. Release notes are shown as plain
+  text, never as HTML. Set `UPDATE_CHECK=0` to turn it off; it is on by default
+  in release builds only.
+
 ## [1.4.3] - 2026-11-24
 
 ### Changed

@@ -6,7 +6,8 @@
     "build:css": "tailwindcss -c tailwind.config.js -i src/tailwind.css -o ../app/static/css/tailwind.css --minify",
     "watch:css": "tailwindcss -c tailwind.config.js -i src/tailwind.css -o ../app/static/css/tailwind.css --watch",
     "test:e2e": "playwright test",
-    "test:visual": "VISUAL=1 playwright test visual"
+    "test:visual": "VISUAL=1 playwright test visual",
+    "test": "node --test \"test/*.test.js\""
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",

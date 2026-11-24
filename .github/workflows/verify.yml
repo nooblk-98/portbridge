@@ -66,6 +66,9 @@ jobs:
       - name: Install build tooling
         working-directory: frontend
         run: npm ci --ignore-scripts
+      - name: Unit-test the front-end scripts
+        working-directory: frontend
+        run: npm test
       - name: Rebuild the stylesheet
         working-directory: frontend
         run: npm run build:css

@@ -37,6 +37,8 @@ pub struct Config {
     pub allow_local_to_peers: bool,
     pub seed_forwarding: bool,
     pub enable_ipv4_forwarding: bool,
+    /// Whether the dashboard looks for a newer release on GitHub and shows a notice.
+    pub update_check: bool,
     secret_key: Vec<u8>,
 }
 
@@ -229,6 +231,10 @@ impl Config {
             ),
             seed_forwarding: env::var("SEED_FORWARDING").as_deref() == Ok("1"),
             enable_ipv4_forwarding: env::var("ENABLE_IPV4_FORWARDING").as_deref() == Ok("1"),
+            update_check: parse_update_check(
+                env::var("UPDATE_CHECK").ok().as_deref(),
+                crate::is_release_build(),
+            ),
             secret_key,
         })
     }
@@ -275,7 +281,22 @@ impl Config {
             allow_local_to_peers: false,
             seed_forwarding: false,
             enable_ipv4_forwarding: false,
+            update_check: false,
         }
+    }
+}
+
+/// `UPDATE_CHECK=0` turns the new-release notice off and `UPDATE_CHECK=1` turns it
+/// on. Unset, only a release build checks, so a development build never claims
+/// that a release is newer than itself.
+fn parse_update_check(value: Option<&str>, release_build: bool) -> bool {
+    match value
+        .map(|text| text.trim().to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("0" | "false" | "no" | "off") => false,
+        Some("1" | "true" | "yes" | "on") => true,
+        _ => release_build,
     }
 }
 
@@ -313,4 +334,24 @@ fn load_or_create_secret_key(data_dir: &Path) -> Result<Vec<u8>, AppError> {
     crate::storage::create_private_directory(data_dir)?;
     crate::storage::write_atomic(&key_file, &key)?;
     Ok(key)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_update_check;
+
+    #[test]
+    fn update_check_follows_the_setting_and_otherwise_the_build() {
+        for off in ["0", "false", "No", " OFF "] {
+            assert!(!parse_update_check(Some(off), true), "{off}");
+        }
+        for on in ["1", "true", "yes", "On"] {
+            assert!(parse_update_check(Some(on), false), "{on}");
+        }
+        // Unset or unrecognised: release builds check, development builds do not.
+        for unset in [None, Some(""), Some("maybe")] {
+            assert!(parse_update_check(unset, true));
+            assert!(!parse_update_check(unset, false));
+        }
+    }
 }

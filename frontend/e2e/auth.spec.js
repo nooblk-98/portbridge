@@ -1,5 +1,5 @@
 // @ts-check
-const { test, expect } = require("@playwright/test");
+const { test, expect } = require("./fixtures");
 const { signIn } = require("./helpers");
 
 // These tests start signed out.

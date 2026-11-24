@@ -52,6 +52,7 @@
         <main
             class="flex-1 overflow-y-auto bg-gray-50 dark:bg-dark-bg transition-colors duration-300 relative">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {% include "components/update-notice.html" %}
                 {% include "components/import-notice.html" %}
                 {% include "components/dashboard.html" %}
                 {% include "components/clients.html" %}
@@ -69,6 +70,7 @@
 </div>
 
 {% include "components/modals.html" %}
+{% include "components/update-dialog.html" %}
 {% include "components/toast.html" %}
 
 {% endblock %}

@@ -223,9 +223,12 @@ PortBridge is configured through environment variables.
 | `APP_HOST` / `APP_PORT` | `0.0.0.0` / `3000` | Dashboard bind address |
 | `DATA_DIR` | `/data` | Where keys and state are stored |
 | `ALLOW_INTERNET_EGRESS` | allowed | Set to `0` to block peer internet access through the server |
+| `UPDATE_CHECK` | on for releases | Set to `0` to stop the dashboard looking for a newer release, for example on an air-gapped server. See [Upgrading](#upgrading) |
 | `ALLOW_LOCAL_TO_PEERS` | off | Default for the per-peer **Server access** switch: whether Docker containers and other traffic forwarded through the PortBridge server, such as a reverse proxy, may connect to a peer's services. Set to `1` to make it on by default |
 
 ## Upgrading
+
+When a newer release is published, the dashboard shows a notice with what changed and the upgrade command, and lets you **Remind me later** (for a day) or **Ignore this version**. Your browser asks GitHub's public releases API (at most every few hours) and sends nothing about your installation. The server never upgrades itself. Set `UPDATE_CHECK=0` to turn the notice off.
 
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release. On Debian or Ubuntu, use `--upgrade` as shown above. With Docker, pull the new image and recreate the container. Keep the same Compose project name and data volume. If you are upgrading from the earlier Python version, sign in again and recreate legacy public forwards for the intended peers.
 
