@@ -494,6 +494,12 @@
     margin: 0 auto;
 }
 
+/* Even spacing between a dialog's sections (the compiled Tailwind file has no
+   space-y utilities). */
+.pb-dialog > * + * {
+    margin-top: 1.25rem;
+}
+
 .pb-dialog__head {
     display: flex;
     align-items: flex-start;
@@ -632,6 +638,42 @@
 
 .pb-block {
     display: block;
+}
+
+/* Sections inside a dialog are separated by a rule, like "Access per route". */
+.pb-section {
+    border-top: 1px solid var(--pb-border);
+    padding-top: 1rem;
+}
+
+.pb-section .pb-hint {
+    margin-top: 0.6rem;
+}
+
+/* A labelled setting with its control on the right. */
+.pb-setting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--pb-border);
+    border-radius: 0.85rem;
+    background: var(--pb-surface-muted);
+}
+
+.pb-setting__text {
+    min-width: 0;
+}
+
+.pb-setting__text .pb-label {
+    margin-bottom: 0.15rem;
+}
+
+@media (min-width: 640px) {
+    .pb-field-grid--three {
+        grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
+    }
 }
 
 .pb-spinner {
@@ -861,30 +903,30 @@
    custom properties, matching the existing cards.
    ------------------------------------------------------------------ */
 :root {
-    --pb-panel-bg: #ffffff;
-    --pb-panel-border: #f3f4f6;
-    --pb-line: #e2e8f0;
-    --pb-text: #0f172a;
-    --pb-muted: #64748b;
-    --pb-track: #e2e8f0;
-    --pb-surface: #f8fafc;
-    --pb-ok: #10b981;
-    --pb-warn: #f59e0b;
-    --pb-crit: #ef4444;
-    --pb-down: #0ea5e9;
-    --pb-up: #6366f1;
-    --pb-accent: #0369a1;
+    --db-panel-bg: #ffffff;
+    --db-panel-border: #f3f4f6;
+    --db-line: #e2e8f0;
+    --db-text: #0f172a;
+    --db-muted: #64748b;
+    --db-track: #e2e8f0;
+    --db-surface: #f8fafc;
+    --db-ok: #10b981;
+    --db-warn: #f59e0b;
+    --db-crit: #ef4444;
+    --db-down: #0ea5e9;
+    --db-up: #6366f1;
+    --db-accent: #0369a1;
 }
 
 .dark {
-    --pb-panel-bg: rgb(30 41 59);
-    --pb-panel-border: rgb(51 65 85);
-    --pb-line: #334155;
-    --pb-text: #f1f5f9;
-    --pb-muted: #94a3b8;
-    --pb-track: #334155;
-    --pb-surface: rgb(15 23 42 / 0.55);
-    --pb-accent: #0ea5e9;
+    --db-panel-bg: rgb(30 41 59);
+    --db-panel-border: rgb(51 65 85);
+    --db-line: #334155;
+    --db-text: #f1f5f9;
+    --db-muted: #94a3b8;
+    --db-track: #334155;
+    --db-surface: rgb(15 23 42 / 0.55);
+    --db-accent: #0ea5e9;
 }
 
 /* The layout follows the width of the content area, so it adapts whether or
@@ -934,13 +976,15 @@
 }
 
 .pb-panel {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
     padding: 1.5rem;
-    border: 1px solid var(--pb-panel-border);
+    border: 1px solid var(--db-panel-border);
     border-radius: 1rem;
-    background: var(--pb-panel-bg);
+    background: var(--db-panel-bg);
     box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    color: var(--pb-text);
+    color: var(--db-text);
 }
 
 .pb-panel__head {
@@ -968,25 +1012,25 @@
     white-space: nowrap;
     font-size: 0.9375rem;
     font-weight: 600;
-    color: var(--pb-text);
+    color: var(--db-text);
 }
 
 .pb-panel__hint {
     margin-left: auto;
     font-size: 0.75rem;
-    color: var(--pb-muted);
+    color: var(--db-muted);
     text-align: right;
 }
 
 .pb-muted {
     font-size: 0.8125rem;
-    color: var(--pb-muted);
+    color: var(--db-muted);
 }
 
 .pb-foot {
     margin: 0.875rem 0 0;
     font-size: 0.75rem;
-    color: var(--pb-muted);
+    color: var(--db-muted);
 }
 
 /* Icon tile tints */
@@ -1003,9 +1047,9 @@
 .dark .pb-tint-rose { background: rgb(244 63 94 / 0.16); color: #fb7185; }
 
 /* Tones for rings and meters */
-.pb-tone-ok { --tone: var(--pb-ok); }
-.pb-tone-warn { --tone: var(--pb-warn); }
-.pb-tone-crit { --tone: var(--pb-crit); }
+.pb-tone-ok { --tone: var(--db-ok); }
+.pb-tone-warn { --tone: var(--db-warn); }
+.pb-tone-crit { --tone: var(--db-crit); }
 
 /* Ring gauge */
 .pb-ring {
@@ -1013,7 +1057,7 @@
     flex: none;
     width: 7.5rem;
     height: 7.5rem;
-    --tone: var(--pb-ok);
+    --tone: var(--db-ok);
 }
 
 .pb-ring--sm {
@@ -1033,7 +1077,7 @@
 }
 
 .pb-ring__track {
-    stroke: var(--pb-track);
+    stroke: var(--db-track);
 }
 
 .pb-ring__value {
@@ -1059,7 +1103,7 @@
 .pb-ring__label strong {
     font-size: 1.75rem;
     font-weight: 700;
-    color: var(--pb-text);
+    color: var(--db-text);
 }
 
 .pb-ring--sm .pb-ring__label strong {
@@ -1069,24 +1113,47 @@
 .pb-ring__label span {
     margin-top: 0.125rem;
     font-size: 0.75rem;
-    color: var(--pb-muted);
+    color: var(--db-muted);
 }
 
 /* Peers online */
 .pb-split {
     display: flex;
+    flex: 1;
     align-items: center;
     gap: 1.25rem;
+}
+
+/* Centres a card's content in the space left by a taller neighbour. */
+.pb-panel__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .pb-peerlist {
     flex: 1;
     min-width: 0;
-    max-height: 12rem;
     margin: 0;
     padding: 0;
-    overflow-y: auto;
     list-style: none;
+}
+
+.pb-peerlist__more {
+    padding: 0.25rem 0 0 2.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.pb-peerlist__more a {
+    color: var(--db-accent);
+    text-decoration: none;
+}
+
+.pb-peerlist__more a:hover,
+.pb-peerlist__more a:focus-visible {
+    text-decoration: underline;
 }
 
 .pb-peerlist__item {
@@ -1109,18 +1176,18 @@
     border-radius: 50%;
 }
 
-.pb-dot {
+.pb-status-dot {
     position: absolute;
     right: -2px;
     bottom: -2px;
     width: 0.75rem;
     height: 0.75rem;
-    border: 2px solid var(--pb-panel-bg);
+    border: 2px solid var(--db-panel-bg);
     border-radius: 50%;
 }
 
-.pb-dot--on { background: var(--pb-ok); }
-.pb-dot--off { background: #94a3b8; }
+.pb-status-dot--on { background: var(--db-ok); }
+.pb-status-dot--off { background: #94a3b8; }
 
 .pb-peerlist__text {
     display: flex;
@@ -1139,7 +1206,7 @@
 
 .pb-peerlist__sub {
     font-size: 0.75rem;
-    color: var(--pb-muted);
+    color: var(--db-muted);
 }
 
 /* Total traffic */
@@ -1163,7 +1230,7 @@
     gap: 0.25rem;
     font-size: 0.8125rem;
     font-weight: 500;
-    color: var(--pb-muted);
+    color: var(--db-muted);
 }
 
 .pb-stat__label .material-symbols-rounded,
@@ -1175,27 +1242,27 @@
     font-size: 1.75rem;
     font-weight: 700;
     line-height: 1.15;
-    color: var(--pb-text);
+    color: var(--db-text);
 }
 
 .pb-stat__sub {
     font-size: 0.75rem;
-    color: var(--pb-muted);
+    color: var(--db-muted);
 }
 
-.pb-c-down { color: var(--pb-down); }
-.pb-c-up { color: var(--pb-up); }
+.pb-c-down { color: var(--db-down); }
+.pb-c-up { color: var(--db-up); }
 
 .pb-split-bar {
     display: flex;
     height: 0.5rem;
     overflow: hidden;
     border-radius: 9999px;
-    background: var(--pb-track);
+    background: var(--db-track);
 }
 
-.pb-split-bar__down { background: var(--pb-down); transition: width 0.6s ease; }
-.pb-split-bar__up { background: var(--pb-up); transition: width 0.6s ease; }
+.pb-split-bar__down { background: var(--db-down); transition: width 0.6s ease; }
+.pb-split-bar__up { background: var(--db-up); transition: width 0.6s ease; }
 
 .pb-split-bar__legend,
 .pb-chart-legend {
@@ -1204,7 +1271,7 @@
     gap: 1rem;
     margin-top: 0.625rem;
     font-size: 0.75rem;
-    color: var(--pb-muted);
+    color: var(--db-muted);
 }
 
 .pb-split-bar__legend {
@@ -1212,7 +1279,7 @@
 }
 
 .pb-split-bar__legend b {
-    color: var(--pb-text);
+    color: var(--db-text);
 }
 
 .pb-swatch {
@@ -1223,8 +1290,8 @@
     border-radius: 50%;
 }
 
-.pb-swatch--down { background: var(--pb-down); }
-.pb-swatch--up { background: var(--pb-up); }
+.pb-swatch--down { background: var(--db-down); }
+.pb-swatch--up { background: var(--db-up); }
 
 /* Health */
 .pb-badge {
@@ -1263,9 +1330,9 @@
     font-size: 1.25rem;
 }
 
-.pb-check__icon--ok { color: var(--pb-ok); }
-.pb-check__icon--warn { color: var(--pb-warn); }
-.pb-check__icon--fail { color: var(--pb-crit); }
+.pb-check__icon--ok { color: var(--db-ok); }
+.pb-check__icon--warn { color: var(--db-warn); }
+.pb-check__icon--fail { color: var(--db-crit); }
 
 .pb-check__text {
     display: flex;
@@ -1280,7 +1347,7 @@
 
 .pb-check__detail {
     font-size: 0.75rem;
-    color: var(--pb-muted);
+    color: var(--db-muted);
     overflow-wrap: anywhere;
 }
 
@@ -1289,7 +1356,7 @@
     display: inline-flex;
     margin-left: auto;
     padding: 2px;
-    border: 1px solid var(--pb-line);
+    border: 1px solid var(--db-line);
     border-radius: 9999px;
 }
 
@@ -1300,23 +1367,23 @@
     background: transparent;
     font-size: 0.75rem;
     font-weight: 600;
-    color: var(--pb-muted);
+    color: var(--db-muted);
     cursor: pointer;
     transition: background-color 0.15s, color 0.15s;
 }
 
 .pb-segmented button:hover {
-    background: var(--pb-surface);
-    color: var(--pb-text);
+    background: var(--db-surface);
+    color: var(--db-text);
 }
 
 .pb-segmented button.is-active {
-    background: var(--pb-accent);
+    background: var(--db-accent);
     color: #ffffff;
 }
 
 .pb-segmented button:focus-visible {
-    outline: 2px solid var(--pb-accent);
+    outline: 2px solid var(--db-accent);
     outline-offset: 2px;
 }
 
@@ -1395,7 +1462,7 @@
     gap: 1rem;
     margin-top: 0.25rem;
     font-size: 0.75rem;
-    color: var(--pb-muted);
+    color: var(--db-muted);
 }
 
 .pb-talker__split > span {
@@ -1409,14 +1476,14 @@
     margin-top: 0.375rem;
     overflow: hidden;
     border-radius: 9999px;
-    background: var(--pb-track);
+    background: var(--db-track);
 }
 
 .pb-meter__bar {
     display: block;
     height: 100%;
     border-radius: 9999px;
-    background: linear-gradient(90deg, var(--pb-down), var(--pb-up));
+    background: linear-gradient(90deg, var(--db-down), var(--db-up));
     transition: width 0.6s ease;
 }
 
@@ -1457,12 +1524,12 @@
 
 .pb-gauge__name .material-symbols-rounded {
     font-size: 1.125rem;
-    color: var(--pb-muted);
+    color: var(--db-muted);
 }
 
 .pb-gauge__sub {
     font-size: 0.75rem;
-    color: var(--pb-muted);
+    color: var(--db-muted);
 }
 
 .pb-load {
@@ -1484,7 +1551,7 @@
 }
 
 .pb-load__label {
-    color: var(--pb-muted);
+    color: var(--db-muted);
 }
 
 .pb-load__value {

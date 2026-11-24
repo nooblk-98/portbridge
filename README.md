@@ -21,19 +21,24 @@ PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptabl
 ## Screenshots
 
 <p align="center">
-  <img src="images/screenshots/dashboard.png" alt="PortBridge dashboard" width="100%">
+  <img src="images/screenshots/dashboard.png" alt="PortBridge dashboard with peers online, traffic, connection health, a traffic chart, top talkers and server gauges" width="100%">
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="images/screenshots/clients.png" alt="Clients: connected peers with handshake and data usage"><br><sub><b>Clients</b>: peers, handshakes and data usage</sub></td>
-    <td width="50%"><img src="images/screenshots/routes.png" alt="Routes: who may use each advertised route"><br><sub><b>Routes</b>: advertised routes and who can reach them</sub></td>
+    <td width="50%"><img src="images/screenshots/clients.png" alt="Clients: peer cards with avatars, a split tunnel switch, advertised routes and data usage"><br><sub><b>Clients</b>: avatars, a split tunnel switch, routes and data usage</sub></td>
+    <td width="50%"><img src="images/screenshots/routes.png" alt="Routes: who may use each advertised route and which profiles need a fresh export"><br><sub><b>Routes</b>: who can use each route and which profiles need exporting</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="images/screenshots/forwarding.png" alt="Forwarding: public port rules"><br><sub><b>Forwarding</b>: publish a service on a public port</sub></td>
-    <td width="50%"><img src="images/screenshots/dashboard-dark.png" alt="Dashboard in dark mode"><br><sub><b>Dark mode</b>: follows your system or your choice</sub></td>
+    <td width="50%"><img src="images/screenshots/peer-settings.png" alt="Peer settings: advertised routes, access per route, split tunnel, DNS, MTU and keepalive"><br><sub><b>Peer settings</b>: routes, access, split tunnel and network options</sub></td>
   </tr>
 </table>
+
+<p align="center">
+  <img src="images/screenshots/dashboard-dark.png" alt="The dashboard in dark mode" width="100%"><br>
+  <sub><b>Dark mode</b>: follows your system or your choice</sub>
+</p>
 
 ## Architecture
 

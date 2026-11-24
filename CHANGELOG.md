@@ -5,6 +5,28 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.2.2] - 2026-11-24
+
+### Changed
+
+- **A tidier Peer settings dialog.** Sections now have even spacing and
+  dividers, split tunnel is a labelled switch row that matches the switch on
+  peer cards, and DNS, MTU and keepalive share one row with short labels and a
+  single help line.
+- The Peers online card lists up to five peers and links to the rest, so it no
+  longer needs an inner scrollbar. Cards that sit beside a taller one centre
+  their content.
+- The README screenshots show the current interface, including the Peer
+  settings dialog, with sample peers.
+
+### Fixed
+
+- The dashboard styles reused names that older styles already used. That shifted
+  some text and background colours on the Routes page and in dialogs, and drew a
+  stray green dot in the corner of the Routes page. They now use their own names.
+- The disk gauge reports the real filesystem instead of a bind mount created by
+  the service sandbox.
+
 ## [1.2.0] - 2026-11-24
 
 ### Added
@@ -116,6 +138,7 @@ First release of the Rust version of PortBridge: a WireGuard server with a web
 dashboard, per-peer routes with access rules, and public TCP and UDP port
 forwarding.
 
+[1.2.2]: https://github.com/nooblk-98/portbridge/compare/v1.2.0...v1.2.2
 [1.2.0]: https://github.com/nooblk-98/portbridge/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/nooblk-98/portbridge/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/nooblk-98/portbridge/releases/tag/v1.0.0

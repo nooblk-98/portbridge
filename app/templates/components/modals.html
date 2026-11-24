@@ -384,26 +384,44 @@
             </template>
         </div>
 
-        <div class="pb-field-grid">
-            <label class="pb-block pb-field-grid__wide">
-                <input type="checkbox" class="pb-choice__input" x-model="forms.options.split_tunnel">
-                <span>Split tunnel: only VPN and advertised-route traffic uses the tunnel, so the device keeps its own internet connection and IP</span>
-            </label>
-            <p class="pb-hint pb-field-grid__wide">Turn this off for a full tunnel, which sends all of the device's internet traffic through this server and shows the server's IP address. Re-import the profile after changing it.</p>
-            <label class="pb-block">
-                <span class="pb-label">DNS servers (optional)</span>
-                <input x-model="forms.options.dns" class="pb-input w-full" inputmode="decimal"
-                    autocomplete="off">
-            </label>
-            <label class="pb-block">
-                <span class="pb-label">MTU (blank for automatic)</span>
-                <input type="number" min="1280" max="9000" x-model.number="forms.options.mtu" class="pb-input w-full">
-            </label>
-            <label class="pb-block">
-                <span class="pb-label">Keepalive in seconds (0 disables it)</span>
-                <input type="number" min="0" max="65535" required x-model.number="forms.options.keepalive"
-                    class="pb-input w-full">
-            </label>
+        <div class="pb-section">
+            <div class="pb-setting">
+                <div class="pb-setting__text">
+                    <label for="peer-split-tunnel" class="pb-label">Split tunnel</label>
+                    <p id="peer-split-help" class="pb-hint pb-hint--tight">
+                        <strong>On:</strong> only VPN and advertised-route traffic uses the tunnel, so the device keeps
+                        its own internet connection and IP address.
+                        <strong>Off (full tunnel):</strong> all of its internet traffic goes through this server and
+                        shows the server's IP address.
+                    </p>
+                </div>
+                <input id="peer-split-tunnel" type="checkbox" switch role="switch" class="pb-switch"
+                    x-model="forms.options.split_tunnel" aria-describedby="peer-split-help">
+            </div>
+        </div>
+
+        <div class="pb-section">
+            <div class="pb-field-grid pb-field-grid--three">
+                <label class="pb-block">
+                    <span class="pb-label">DNS servers</span>
+                    <input x-model="forms.options.dns" class="pb-input w-full" inputmode="decimal"
+                        autocomplete="off" placeholder="Default" aria-describedby="peer-network-help">
+                </label>
+                <label class="pb-block">
+                    <span class="pb-label">MTU</span>
+                    <input type="number" min="1280" max="9000" x-model.number="forms.options.mtu"
+                        class="pb-input w-full" placeholder="Auto" aria-describedby="peer-network-help">
+                </label>
+                <label class="pb-block">
+                    <span class="pb-label">Keepalive (seconds)</span>
+                    <input type="number" min="0" max="65535" required x-model.number="forms.options.keepalive"
+                        class="pb-input w-full" aria-describedby="peer-network-help">
+                </label>
+            </div>
+            <p id="peer-network-help" class="pb-hint">
+                DNS and MTU are optional: leave them blank to use the defaults. A keepalive of 25 seconds keeps the
+                tunnel open behind NAT, and 0 turns it off.
+            </p>
         </div>
 
         <p class="pb-hint">

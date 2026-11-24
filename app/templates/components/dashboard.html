@@ -88,12 +88,12 @@
                     </div>
                 </div>
                 <ul class="pb-peerlist">
-                    <template x-for="peer in peerRows" :key="peer.public_key">
+                    <template x-for="peer in peerRowsShown" :key="peer.public_key">
                         <li class="pb-peerlist__item">
                             <span class="pb-peerlist__avatar">
                                 <img :src="avatarFor(peer)" alt="" width="32" height="32"
                                     :class="peer.online ? '' : 'pb-avatar--offline'">
-                                <span class="pb-dot" :class="peer.online ? 'pb-dot--on' : 'pb-dot--off'"></span>
+                                <span class="pb-status-dot" :class="peer.online ? 'pb-status-dot--on' : 'pb-status-dot--off'"></span>
                             </span>
                             <span class="pb-peerlist__text">
                                 <span class="pb-peerlist__name" x-text="peer.name"></span>
@@ -102,6 +102,9 @@
                             </span>
                         </li>
                     </template>
+                    <li x-show="peersHidden > 0" class="pb-peerlist__more">
+                        <a href="/clients" @click.prevent="currentTab = 'clients'" x-text="'+' + peersHidden + ' more'"></a>
+                    </li>
                     <li x-show="peerRows.length === 0" class="pb-muted">No peers yet. Add a client to get started.</li>
                 </ul>
             </div>
@@ -113,6 +116,7 @@
                 <span class="pb-panel__icon pb-tint-sky"><span class="material-symbols-rounded">swap_vert</span></span>
                 <h3 id="pb-traffic-title" class="pb-panel__title">Total traffic</h3>
             </header>
+            <div class="pb-panel__body">
             <div class="pb-stat-pair">
                 <div class="pb-stat">
                     <span class="pb-stat__label"><span class="material-symbols-rounded pb-c-down">arrow_downward</span>Download</span>
@@ -133,6 +137,7 @@
             <div class="pb-split-bar__legend">
                 <span><i class="pb-swatch pb-swatch--down"></i>Download <b x-text="downloadShare + '%'"></b></span>
                 <span><i class="pb-swatch pb-swatch--up"></i>Upload <b x-text="uploadShare + '%'"></b></span>
+            </div>
             </div>
             <p class="pb-foot" x-text="trafficSince"></p>
         </section>

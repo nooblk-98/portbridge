@@ -202,6 +202,9 @@ function app() {
             const items = this.stats?.peers?.items || [];
             return [...items].sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name));
         },
+        /** Rows shown in the card; the rest are summarised so the list never needs a scrollbar. */
+        get peerRowsShown() { return this.peerRows.slice(0, 5); },
+        get peersHidden() { return Math.max(0, this.peerRows.length - 5); },
         get peersTotal() { return this.stats?.peers?.total || 0; },
         get peersOnline() { return this.stats?.peers?.online || 0; },
         get peersOnlinePct() {
