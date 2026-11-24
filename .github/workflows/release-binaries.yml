@@ -17,6 +17,12 @@ on:
         type: string
   repository_dispatch:
     types: [release-binaries-requested]
+  workflow_call:
+    inputs:
+      tag:
+        description: Existing release tag to attach binaries to
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -122,12 +128,12 @@ jobs:
 
       - name: Assemble release archive
         env:
-          TAG: ${{ needs.metadata.outputs.tag }}
           ARCH: ${{ matrix.arch }}
           TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          staging="portbridge-${TAG}-linux-${ARCH}"
+          # Version-free names let installs use releases/latest/download/.
+          staging="portbridge-linux-${ARCH}"
           mkdir -p "dist/${staging}"
           install -m 0755 "target/${TARGET}/release/portbridge" "dist/${staging}/portbridge"
           install -m 0755 install.sh "dist/${staging}/install.sh"
@@ -172,7 +178,7 @@ jobs:
         run: |
           set -euo pipefail
           cd dist
-          archives=("portbridge-${TAG}-linux-x86_64.tar.gz" "portbridge-${TAG}-linux-arm64.tar.gz")
+          archives=("portbridge-linux-x86_64.tar.gz" "portbridge-linux-arm64.tar.gz")
           assets=("${archives[@]}" SHA256SUMS)
           for archive in "${archives[@]}"; do
             tar -tzf "$archive" >/dev/null

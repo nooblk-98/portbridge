@@ -49,32 +49,19 @@ To build from a local checkout instead, run `docker compose up -d --build`.
 
 ### Debian or Ubuntu (no Docker)
 
-Requires systemd and sudo. Releases ship static binaries for `x86_64` and `arm64`, so no Rust toolchain is needed. This command downloads a pinned release, verifies its SHA-256 checksum, and runs the interactive installer. Replace `vpn.example.com` with your server's public hostname or IP.
+Requires systemd and sudo. Run the installer with your server's public hostname or IP in place of `vpn.example.com`. It downloads the latest release for your architecture (`x86_64` or `arm64`), verifies its SHA-256 checksum, and prompts for a dashboard password. No Rust toolchain is needed.
 
-```bash
-(
-set -euo pipefail
-release=v1.0.0   # use a tag from the Releases page
-case "$(uname -m)" in
-  x86_64|amd64) arch=x86_64 ;;
-  aarch64|arm64) arch=arm64 ;;
-  *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
-esac
-umask 077
-work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT
-cd "$work"
-archive="portbridge-${release}-linux-${arch}.tar.gz"
-url="https://github.com/nooblk-98/portbridge/releases/download/${release}"
-curl -fsSLO "${url}/${archive}"
-curl -fsSLO "${url}/SHA256SUMS"
-expected=$(awk -v file="$archive" '$2 == file {print $1}' SHA256SUMS)
-[[ -n $expected ]] || { echo "No checksum published for $archive" >&2; exit 1; }
-printf '%s  %s\n' "$expected" "$archive" | sha256sum -c -
-tar -xzf "$archive"
-sudo bash "${archive%.tar.gz}/install.sh" vpn.example.com
-)
+```sh
+curl -fsSL https://raw.githubusercontent.com/nooblk-98/portbridge/main/install.sh | sudo bash -s -- vpn.example.com
 ```
+
+With `wget`:
+
+```sh
+wget -qO- https://raw.githubusercontent.com/nooblk-98/portbridge/main/install.sh | sudo bash -s -- vpn.example.com
+```
+
+To pin a version, set `PORTBRIDGE_VERSION` on the `sudo` side, for example `| sudo PORTBRIDGE_VERSION=v1.0.0 bash -s -- vpn.example.com`.
 
 The installer prompts for a dashboard password (16–128 letters or numbers), creates the `pb0` WireGuard interface, stores data in `/var/lib/portbridge`, and starts the `portbridge` service. Use the SSH tunnel above to reach the dashboard.
 

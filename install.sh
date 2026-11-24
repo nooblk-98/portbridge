@@ -9,7 +9,14 @@ fi
 
 endpoint=$1
 
-source_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# When piped from curl or wget there is no script file, so there is no local
+# release archive and the latest release is downloaded instead.
+script_path=${BASH_SOURCE[0]:-}
+source_dir=
+if [[ -n $script_path && -f $script_path ]]; then
+    source_dir=$(cd -- "$(dirname -- "$script_path")" && pwd)
+fi
+release_repo=nooblk-98/portbridge
 app_dir=/opt/portbridge
 config_dir=/etc/portbridge
 state_dir=/var/lib/portbridge
@@ -65,17 +72,68 @@ if [[ -e /etc/wireguard/pb0.conf ]] || ip link show dev pb0 >/dev/null 2>&1; the
     die "The pb0 WireGuard interface is already in use."
 fi
 
+download() {
+    local url=$1 out=$2
+    if command -v curl >/dev/null; then
+        curl -fsSL -o "$out" "$url"
+    elif command -v wget >/dev/null; then
+        wget -q -O "$out" "$url"
+    else
+        die "curl or wget is required to download PortBridge. Install one with: apt-get install -y curl"
+    fi
+}
+
+# Download the latest release (or PORTBRIDGE_VERSION, for example v1.0.1),
+# verify its SHA-256 checksum, and use it as the install source.
+fetch_release() {
+    local arch base archive expected
+    case "$(uname -m)" in
+        x86_64 | amd64) arch=x86_64 ;;
+        aarch64 | arm64) arch=arm64 ;;
+        *) die "Unsupported architecture: $(uname -m)" ;;
+    esac
+    if [[ -n ${PORTBRIDGE_VERSION:-} ]]; then
+        [[ $PORTBRIDGE_VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]] ||
+            die "PORTBRIDGE_VERSION must look like v1.2.3."
+        base="https://github.com/$release_repo/releases/download/$PORTBRIDGE_VERSION"
+    else
+        base="https://github.com/$release_repo/releases/latest/download"
+    fi
+    archive=portbridge-linux-$arch.tar.gz
+    work_dir=$(mktemp -d)
+    trap 'rm -rf "$work_dir"' EXIT
+    echo "Downloading $archive from $base"
+    download "$base/$archive" "$work_dir/$archive"
+    download "$base/SHA256SUMS" "$work_dir/SHA256SUMS"
+    expected=$(awk -v file="$archive" '$2 == file {print $1}' "$work_dir/SHA256SUMS")
+    [[ -n $expected ]] || die "No checksum published for $archive."
+    printf '%s  %s\n' "$expected" "$archive" | (cd "$work_dir" && sha256sum -c -) ||
+        die "Checksum verification failed for $archive."
+    tar -xzf "$work_dir/$archive" -C "$work_dir"
+    source_dir=$work_dir/${archive%.tar.gz}
+    portbridge_bin=$source_dir/portbridge
+}
+
 # A release archive keeps the binary next to install.sh; a source checkout
-# passes PORTBRIDGE_BINARY explicitly.
-portbridge_bin=${PORTBRIDGE_BINARY:-$source_dir/portbridge}
+# passes PORTBRIDGE_BINARY explicitly; otherwise the latest release is fetched.
+work_dir=
+portbridge_bin=${PORTBRIDGE_BINARY:-}
+if [[ -z $portbridge_bin ]]; then
+    if [[ -n $source_dir && -x $source_dir/portbridge ]]; then
+        portbridge_bin=$source_dir/portbridge
+    else
+        fetch_release
+    fi
+fi
 if [[ ! -f $portbridge_bin || ! -x $portbridge_bin ]]; then
     die "PortBridge binary not found at $portbridge_bin. Use a complete release archive or set PORTBRIDGE_BINARY to a trusted build."
 fi
-if [[ ! -f $source_dir/app/templates/login.html || ! -f $source_dir/app/static/js/app.js ]]; then
+if [[ -z $source_dir || ! -f $source_dir/app/templates/login.html || ! -f $source_dir/app/static/js/app.js ]]; then
     die "The installer is missing the dashboard files (app/templates and app/static). Use a complete release archive or repository checkout."
 fi
 
-if ! read -rsp "Dashboard password (at least 16 letters or numbers): " password; then
+# Read from the terminal so the prompt also works when the script is piped in.
+if ! read -rsp "Dashboard password (at least 16 letters or numbers): " password </dev/tty; then
     echo
     die "The dashboard password prompt needs an interactive terminal."
 fi
@@ -84,8 +142,9 @@ if [[ ! $password =~ ^[A-Za-z0-9]{16,128}$ ]]; then
     die "Choose a password of 16 to 128 letters or numbers."
 fi
 
-apt-get update
-apt-get install -y ca-certificates iproute2 iptables procps wireguard-tools
+# Child commands read /dev/null so they cannot consume a script piped on stdin.
+apt-get update </dev/null
+apt-get install -y ca-certificates iproute2 iptables procps wireguard-tools </dev/null
 
 install -d -m 0700 "$app_dir" "$config_dir" "$state_dir"
 install -d -m 0750 "$app_dir/app"
