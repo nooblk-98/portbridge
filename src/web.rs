@@ -149,7 +149,7 @@ async fn security_headers(State(state): State<AppState>, request: Request, next:
         response
             .headers_mut()
             .insert(header::VARY, HeaderValue::from_static("Cookie"));
-        // Flask refreshes the session cookie on every authenticated response.
+        // Keep the session alive: refresh its cookie on every authenticated response.
         if let Some(token) = token.filter(|_| !response.headers().contains_key(header::SET_COOKIE))
         {
             let cookie = format!("session={token}; HttpOnly; Path=/; SameSite=Lax");
@@ -161,8 +161,8 @@ async fn security_headers(State(state): State<AppState>, request: Request, next:
     response
 }
 
-/// Flask's JSON provider sorts keys and uses compact separators; match it so the
-/// dashboard API is byte-compatible with the reference backend.
+/// JSON with sorted keys and compact separators, so API responses are stable from
+/// one request to the next.
 pub fn json_response(status: StatusCode, value: Value) -> Response {
     let sorted = sort_json(value);
     let mut body = serde_json::to_string(&sorted).unwrap_or_else(|_| "{}".to_string());

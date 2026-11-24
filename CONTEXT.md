@@ -22,7 +22,7 @@ PortBridge exposes services running on devices behind NAT/CGNAT/Starlink through
 
 ## Technical Structure
 
-**Config** — reads the same environment variables and paths as the Python implementation (`DATA_DIR`, `WG_*`, `APP_HOST`, `APP_PORT`, `ADMIN_PASSWORD`). `APP_HOST` defaults to `0.0.0.0`, `APP_PORT` to `3000`.
+**Config** — reads its settings from environment variables and paths (`DATA_DIR`, `WG_*`, `APP_HOST`, `APP_PORT`, `ADMIN_PASSWORD`). `APP_HOST` defaults to `0.0.0.0`, `APP_PORT` to `3000`.
 
 **Storage** — a seam that persists JSON state and text files. `JsonFileStorage` reads/writes the real filesystem; `InMemoryStorage` supports tests.
 
@@ -38,6 +38,6 @@ PortBridge exposes services running on devices behind NAT/CGNAT/Starlink through
 
 **ForwardingManager** — orchestrates port forwarding rule lifecycle (add, remove) by coordinating `IPTablesService`, `Storage` and `RuleRenderer`.
 
-**Auth** — bounded-expiry server-side sessions with random opaque tokens, password-bound session and remember cookies, constant-time password comparison and the per-IP login rate limit. Legacy Flask cookies require one login after upgrade.
+**Auth** — bounded-expiry server-side sessions with random opaque tokens, password-bound session and remember cookies, constant-time password comparison and the per-IP login rate limit. Sessions from the earlier Python version are not accepted, so upgrading from it needs one login.
 
-**Web** — the axum router, JSON API, Jinja-compatible templates and static assets. Templates and assets are shared with the frontend workstream under `app/templates` and `app/static`.
+**Web** — the axum router, JSON API, Jinja-compatible templates and static assets. Templates live under `app/templates` and static assets under `app/static`; the stylesheet is built from `frontend/` (see `frontend/README.md`).

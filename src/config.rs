@@ -42,7 +42,8 @@ pub struct Config {
     secret_key: Vec<u8>,
 }
 
-/// IPv4 addresses in a subnet, following Python's `ipaddress` host rules.
+/// The usable host addresses in a subnet: every address except the network and
+/// broadcast ones (a /31 or /32 has none to skip).
 pub struct Hosts {
     next: u32,
     last: u32,
