@@ -495,7 +495,7 @@ mod tests {
     }
 
     #[test]
-    fn local_services_may_reach_peers_and_their_routes_by_default() {
+    fn local_programs_may_reach_peers_and_their_routes_when_the_default_is_on() {
         let clients = vec![
             peer(
                 "home",

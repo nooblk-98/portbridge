@@ -183,11 +183,11 @@ Open **Forwarding**, create a rule, and choose a public port, protocol, target p
 
 The service sees the original client address, so its replies must return through WireGuard. With a split-tunnel profile, add a return route for the permitted sources, or use a full-tunnel profile. Allow the public port through your firewalls, and for Docker add the port to the Compose `ports` list, for example `"30000:30000/tcp"`.
 
-### Reach peers from the server
+### Reach peers from the PortBridge server
 
-Programs on the server itself can open connections to peers: a Docker container such as Nginx Proxy Manager, a script, or `curl`. That makes the server a reverse proxy for services that live behind NAT. Point a proxy host at a peer's tunnel address (for example `http://10.10.0.2:8080`) or at a subnet the peer advertises (for example `http://192.168.1.106:8080`). Peers can only answer these connections. They cannot start new ones to the server's other services.
+Programs on the server that hosts PortBridge can open connections to a peer once you switch **Server access** on for it: a Docker container such as Nginx Proxy Manager, a script, or `curl`. That makes the server a reverse proxy for services that live behind NAT. It is off by default. Point a proxy host at a peer's tunnel address (for example `http://10.10.0.2:8080`) or at a subnet the peer advertises (for example `http://192.168.1.106:8080`). Peers can only answer these connections. They cannot start new ones to the server's other services.
 
-Each peer has a **Server access** switch on its card and in its settings, so you can allow it for the peers you proxy and block it for the rest. `ALLOW_LOCAL_TO_PEERS` sets the default for peers that have not been switched either way, and `ALLOW_LOCAL_TO_PEERS=0` makes the default off.
+Each peer has a **Server access** switch on its card and in its settings, so you can allow it for the peers you proxy and leave it off for the rest. Set `ALLOW_LOCAL_TO_PEERS=1` to make it on by default for peers that have not been switched either way.
 
 ### Internet access through the VPN
 
@@ -208,7 +208,7 @@ PortBridge is configured through environment variables.
 | `APP_HOST` / `APP_PORT` | `0.0.0.0` / `3000` | Dashboard bind address |
 | `DATA_DIR` | `/data` | Where keys and state are stored |
 | `ALLOW_INTERNET_EGRESS` | allowed | Set to `0` to block peer internet access through the server |
-| `ALLOW_LOCAL_TO_PEERS` | allowed | Default for the per-peer **Server access** switch: whether programs on the server, such as a Docker reverse proxy, may open connections to a peer. Set to `0` to make it off by default |
+| `ALLOW_LOCAL_TO_PEERS` | off | Default for the per-peer **Server access** switch: whether programs on the PortBridge hosted server, such as a Docker reverse proxy, may open connections to a peer. Set to `1` to make it on by default |
 
 ## Upgrading
 

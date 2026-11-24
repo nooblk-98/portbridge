@@ -110,7 +110,7 @@
                     <span role="tooltip" class="pb-tip__bubble" :id="'split-tip-' + client.public_key">
                         <strong>Split tunnel</strong>
                         <span>On: only VPN and advertised-route traffic uses the tunnel, so this device keeps its own internet connection and IP address.</span>
-                        <span>Off (full tunnel): all of its internet traffic goes through this server and shows the server's IP. Re-import the profile after changing it.</span>
+                        <span>Off (full tunnel): all of its internet traffic goes through the PortBridge hosted server and shows that server's IP. Re-import the profile after changing it.</span>
                     </span>
                 </div>
 
@@ -122,13 +122,13 @@
                     </label>
                     <input type="checkbox" switch role="switch" class="pb-switch"
                         :id="'local-' + client.public_key"
-                        :checked="!client.options || client.options.local_access !== false"
+                        :checked="!!client.options && client.options.local_access === true"
                         :aria-describedby="'local-tip-' + client.public_key"
                         @change="toggleLocalAccess(client, $event)">
                     <span role="tooltip" class="pb-tip__bubble" :id="'local-tip-' + client.public_key">
                         <strong>Server access</strong>
-                        <span>On: programs on this server, such as a Docker reverse proxy or curl, can open connections to this peer and the networks it advertises.</span>
-                        <span>Off: only other peers (through route access) and forwarded public ports can reach it. No profile change is needed.</span>
+                        <span>On: programs on the PortBridge hosted server, such as a Docker reverse proxy or curl, can open connections to this peer and the networks it advertises.</span>
+                        <span>Off (the default): only other peers (through route access) and forwarded public ports can reach it. No profile change is needed.</span>
                     </span>
                 </div>
 

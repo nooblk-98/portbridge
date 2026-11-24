@@ -5,6 +5,18 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.3.1] - 2026-11-24
+
+### Changed
+
+- **Server access is off by default.** Programs on the PortBridge hosted server,
+  such as a Docker reverse proxy, can reach a peer only after you switch Server
+  access on for it. `ALLOW_LOCAL_TO_PEERS` is now `off` unless set to `1`, and it
+  is the default for peers that have no setting of their own. Peers that relied
+  on the previous default need the switch turned on to keep working.
+- The Server access explanations, toasts and docs now say "the PortBridge hosted
+  server" instead of "this server".
+
 ## [1.3.0] - 2026-11-24
 
 ### Added
@@ -192,6 +204,7 @@ First release of the Rust version of PortBridge: a WireGuard server with a web
 dashboard, per-peer routes with access rules, and public TCP and UDP port
 forwarding.
 
+[1.3.1]: https://github.com/nooblk-98/portbridge/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/nooblk-98/portbridge/compare/v1.2.5...v1.3.0
 [1.2.5]: https://github.com/nooblk-98/portbridge/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/nooblk-98/portbridge/compare/v1.2.3...v1.2.4

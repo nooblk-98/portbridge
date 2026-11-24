@@ -391,8 +391,8 @@
                     <p id="peer-split-help" class="pb-hint pb-hint--tight">
                         <strong>On:</strong> only VPN and advertised-route traffic uses the tunnel, so the device keeps
                         its own internet connection and IP address.
-                        <strong>Off (full tunnel):</strong> all of its internet traffic goes through this server and
-                        shows the server's IP address.
+                        <strong>Off (full tunnel):</strong> all of its internet traffic goes through the PortBridge hosted
+                        server and shows that server's IP address.
                     </p>
                 </div>
                 <input id="peer-split-tunnel" type="checkbox" switch role="switch" class="pb-switch"
@@ -402,10 +402,10 @@
                 <div class="pb-setting__text">
                     <label for="peer-local-access" class="pb-label">Server access</label>
                     <p id="peer-local-access-help" class="pb-hint pb-hint--tight">
-                        <strong>On:</strong> programs on this server, such as a Docker reverse proxy or
-                        <code>curl</code>, can open connections to this peer and the networks it advertises.
-                        <strong>Off:</strong> only other peers (through route access) and forwarded public
-                        ports can reach it. This does not change the device's profile.
+                        <strong>On:</strong> programs on the PortBridge hosted server, such as a Docker reverse proxy
+                        or <code>curl</code>, can open connections to this peer and the networks it advertises.
+                        <strong>Off (the default):</strong> only other peers (through route access) and
+                        forwarded public ports can reach it. This does not change the device's profile.
                     </p>
                 </div>
                 <input id="peer-local-access" type="checkbox" switch role="switch" class="pb-switch"

@@ -123,7 +123,7 @@ function app() {
             });
         },
 
-        /** Allow or block programs on the server (such as a Docker reverse proxy) from reaching a peer. */
+        /** Allow or block programs on the PortBridge hosted server (such as a Docker reverse proxy) from reaching a peer. */
         async toggleLocalAccess(client, event) {
             const input = event.target;
             const enabled = input.checked;
@@ -135,8 +135,8 @@ function app() {
                     body: JSON.stringify({ local_access: enabled }),
                 }).then(this.checkAuth);
                 this.showToast(enabled
-                    ? `Server access on for ${client.name}. Programs on this server can reach it.`
-                    : `Server access off for ${client.name}. Programs on this server can no longer reach it.`);
+                    ? `Server access on for ${client.name}. Programs on the PortBridge hosted server can reach it.`
+                    : `Server access off for ${client.name}. Programs on the PortBridge hosted server can no longer reach it.`);
                 await this.loadData();
             } catch (error) {
                 input.checked = !enabled;
@@ -175,7 +175,7 @@ function app() {
                 }).then(this.checkAuth);
                 this.showToast(enabled
                     ? `Split tunnel on for ${client.name}. Re-import its profile on the device.`
-                    : `Full tunnel on for ${client.name}: all its traffic uses this server. Re-import its profile.`);
+                    : `Full tunnel on for ${client.name}: all its traffic uses the PortBridge hosted server. Re-import its profile.`);
                 await this.loadData();
             } catch (error) {
                 input.checked = !enabled;
