@@ -72,6 +72,32 @@ jobs:
       - name: Check the committed stylesheet is current
         run: git diff --exit-code -- app/static/css/tailwind.css
 
+  e2e:
+    name: Browser end-to-end tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Install test tooling
+        working-directory: frontend
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium
+      - name: Build the test server
+        run: cargo build --locked --example e2e_server
+      - name: Run the browser tests
+        working-directory: frontend
+        run: npx playwright test
+      - name: Keep the report when tests fail
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: playwright-results
+          path: frontend/test-results
+          retention-days: 7
+
   installer:
     name: Installer and dashboard scripts
     runs-on: ubuntu-latest

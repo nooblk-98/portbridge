@@ -31,3 +31,29 @@ the committed file is out of date.
 
 The theme (the `primary` and `dark` colours, fonts and animations) lives in
 `frontend/tailwind.config.js`.
+
+## Browser tests
+
+End-to-end tests drive the real dashboard in Chromium (Playwright) against
+`examples/e2e_server.rs`: the actual server with fixture peers and a fake
+WireGuard/firewall command runner, so nothing touches the host.
+
+```sh
+cd frontend
+npm ci
+npx playwright install chromium
+npm run test:e2e          # starts the server itself (first run compiles it)
+```
+
+They run at a desktop (1280 × 800) and a phone (390 × 844) size and cover
+sign-in, every page, the dialogs, adding and removing peers and rules, route
+access, the theme, the footer and the mobile drawer. Tests find things by role
+and text, never by CSS class, so they keep passing when the styling changes.
+
+To prove a styling change did not alter how anything looks, compare screenshots
+(baselines are local only, because font rendering differs between machines):
+
+```sh
+VISUAL=1 npx playwright test visual --update-snapshots   # on the old code
+VISUAL=1 npx playwright test visual                      # on the new code
+```

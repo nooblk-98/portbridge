@@ -29,7 +29,7 @@
     <!-- Clients Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         <template x-for="client in filteredClients" :key="client.public_key">
-            <div
+            <div data-testid="client-card"
                 class="bg-white dark:bg-dark-surface rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-dark-border hover:shadow-md transition-shadow group">
                 <div class="flex items-start justify-between mb-4">
                     <div class="flex items-center gap-3">
@@ -52,6 +52,7 @@
                     </div>
                     <div class="relative" x-data="{ open: false }">
                         <button @click="open = !open" @click.away="open = false"
+                            :aria-label="'Actions for ' + client.name" aria-haspopup="menu" :aria-expanded="open"
                             class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
                             <span class="material-symbols-rounded">more_vert</span>
                         </button>
