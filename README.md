@@ -53,10 +53,6 @@ PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptabl
 
 ## Screenshots
 
-<p align="center">
-  <img src="images/screenshots/dashboard.png" alt="PortBridge dashboard with peers online, traffic, connection health, a traffic chart, top talkers and server gauges" width="100%">
-</p>
-
 <table>
   <tr>
     <td width="50%"><img src="images/screenshots/clients.png" alt="Clients: peer cards with avatars, a split tunnel switch, advertised routes and data usage"><br><sub><b>Clients</b>: avatars, a split tunnel switch, routes and data usage</sub></td>
