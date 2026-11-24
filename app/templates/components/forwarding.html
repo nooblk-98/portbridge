@@ -20,7 +20,7 @@
     <div x-show="forwardingsReady && !forwardingError"
         class="bg-white dark:bg-dark-surface rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
+            <table class="pb-fwd-table w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-dark-border">
                         <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -52,7 +52,7 @@
                                 x-text="rule.port"></td>
                             <td class="px-6 py-4 font-mono text-sm text-slate-600 dark:text-slate-400"
                                 x-text="rule.target_port || rule.port"></td>
-                            <td class="px-6 py-4">
+                            <td class="pb-fwd-target px-6 py-4">
                                 <div class="flex items-center gap-2">
                                     <span class="material-symbols-rounded text-slate-400 text-lg">computer</span>
                                     <span class="text-sm font-medium text-slate-700 dark:text-slate-300"
@@ -61,7 +61,7 @@
                                         x-text="'(' + rule.client_ip + ')'"></span>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-right">
+                            <td class="pb-fwd-actions px-6 py-4 text-right">
                                 <button @click="confirmDeleteForwarding(rule.port, rule.protocol)"
                                     class="text-slate-400 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
                                     <span class="material-symbols-rounded">delete</span>
