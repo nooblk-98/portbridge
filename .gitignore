@@ -1,61 +1,24 @@
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Virtual Environment
-venv/
-env/
-ENV/
-.env
-
 # Rust
 /target/
 
-# IDE
+# Node (UI build tooling and browser tests only)
+node_modules/
+frontend/e2e/.auth/
+frontend/e2e/*-snapshots/
+frontend/test-results/
+frontend/playwright-report/
+
+# Local configuration and data
+.env
+data/
+*.log
+docker-compose.override.yml
+
+# Editors
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# Docker
-docker-compose.override.yml
-
-# Project specific
-data/
-*.log
+# Local tooling
 skills-lock.json
-
-# Rust
-/target/
-
-/.venv/
-
-# Node (UI build tooling only)
-node_modules/
-
-# Playwright
-frontend/e2e/.auth/
-frontend/test-results/
-frontend/playwright-report/
-frontend/e2e/*-snapshots/

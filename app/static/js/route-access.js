@@ -16,7 +16,7 @@
 })(typeof window !== 'undefined' ? window : null, function () {
     'use strict';
 
-    // Mirrors PRIVATE_ROUTES in app/core/peer_options.py.
+    // The private ranges a peer may advertise; mirrors `is_private` in src/model.rs.
     var PRIVATE_RANGES = [
         [0x0a000000, 8], // 10.0.0.0/8
         [0xac100000, 12], // 172.16.0.0/12
@@ -140,12 +140,6 @@
         });
     }
 
-    function accessMode(value) {
-        var list = accessList(value);
-        if (list === null) return 'all';
-        return list.length === 0 ? 'none' : 'selected';
-    }
-
     /* Complete access map from route rows: only restricted entries are stored. */
     function routeAccessMap(rows) {
         if (!Array.isArray(rows)) return null;
@@ -237,12 +231,7 @@
     }
 
     return {
-        parseIPv4: parseIPv4,
-        formatIPv4: formatIPv4,
-        normalizeRoute: normalizeRoute,
         parseRouteList: parseRouteList,
-        accessList: accessList,
-        accessMode: accessMode,
         routeAccessMap: routeAccessMap,
         buildAccessPayload: buildAccessPayload,
         effectiveAccess: effectiveAccess,
