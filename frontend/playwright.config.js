@@ -21,6 +21,8 @@ module.exports = defineConfig({
     baseURL: BASE_URL,
     // Full Chromium rather than the headless shell, which is not on every host.
     channel: "chromium",
+    // The falling stars are CSS animations; held still, screenshots are stable.
+    reducedMotion: "reduce",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

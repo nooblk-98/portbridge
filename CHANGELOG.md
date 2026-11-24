@@ -5,6 +5,24 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.6.0] - 2026-11-24
+
+### Added
+
+- **A falling-stars background.** Twinkling stars and the occasional shooting star
+  drift behind the dashboard and the sign-in screen, in both themes: a deep indigo
+  night sky in dark mode and a soft lavender sky in light mode. It is pure CSS
+  (keyframes in the Tailwind config), with no scripts and no graphics libraries,
+  so it costs almost nothing. With "reduce motion" on, the stars hold still.
+
+### Fixed
+
+- The large faint icons behind the Total Clients, Active Ports and Network cards
+  were almost invisible, especially in dark mode. They are now clearly visible in
+  both themes.
+- The logo in the desktop sidebar showed inside a white square. It is now a plain
+  circle, like the logo on the phone header and the sign-in screen.
+
 ## [1.5.0] - 2026-11-24
 
 ### Added

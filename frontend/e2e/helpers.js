@@ -50,6 +50,34 @@ async function expectNoHorizontalScroll(page) {
   expect(overflow, "horizontal overflow in px").toBeLessThanOrEqual(0);
 }
 
+/**
+ * The average colour of a region of the page, as [r, g, b] from 0 to 255, read
+ * from a screenshot so it includes everything painted there.
+ * @param {import('@playwright/test').Page} page
+ */
+async function averageColor(page, clip) {
+  const shot = (await page.screenshot({ clip })).toString("base64");
+  return page.evaluate(async source => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${source}`;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = /** @type {CanvasRenderingContext2D} */ (canvas.getContext("2d"));
+    context.drawImage(image, 0, 0);
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    const total = [0, 0, 0];
+    for (let index = 0; index < data.length; index += 4) {
+      total[0] += data[index];
+      total[1] += data[index + 1];
+      total[2] += data[index + 2];
+    }
+    const pixels = data.length / 4;
+    return total.map(sum => Math.round(sum / pixels));
+  }, shot);
+}
+
 /** Collect console errors and failed requests until `stop()` is called. */
 function watchForProblems(page) {
   const problems = [];
@@ -73,5 +101,6 @@ module.exports = {
   navigateTo,
   clearImportNotices,
   expectNoHorizontalScroll,
+  averageColor,
   watchForProblems,
 };
