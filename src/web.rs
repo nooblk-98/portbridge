@@ -25,6 +25,8 @@ style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; \
 font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; \
 object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
 
+const REPO_URL: &str = "https://github.com/nooblk-98/portbridge";
+
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
@@ -38,6 +40,13 @@ pub struct AppState {
 pub fn templates(config: &Config) -> Environment<'static> {
     let mut environment = Environment::new();
     environment.set_loader(path_loader(config.template_dir.clone()));
+    // Shown in the dashboard and sign-in footers.
+    environment.add_global("app_version", crate::version());
+    // A constant URL, so it is safe to emit without HTML escaping its slashes.
+    environment.add_global(
+        "repo_url",
+        minijinja::value::Value::from_safe_string(REPO_URL.to_string()),
+    );
     environment.add_function(
         "url_for",
         |endpoint: String, kwargs: minijinja::value::Kwargs| {
@@ -558,3 +567,28 @@ const _: fn(
     axum::routing::MethodRouter<AppState>,
     axum::routing::MethodRouter<AppState>,
 ) -> axum::routing::MethodRouter<AppState> = |a, _b| a;
+
+#[cfg(test)]
+mod footer_tests {
+    use super::*;
+
+    fn render_page(name: &str) -> String {
+        let config = Config::for_test(std::env::temp_dir());
+        templates(&config)
+            .get_template(name)
+            .expect("template")
+            .render(minijinja::context! {})
+            .expect("render")
+    }
+
+    #[test]
+    fn dashboard_and_login_footers_link_the_repo_and_version() {
+        let version = format!("v{}", crate::version());
+        for page in ["index.html", "login.html"] {
+            let html = render_page(page);
+            assert!(html.contains("class=\"app-footer\""), "{page}");
+            assert!(html.contains(&format!("href=\"{REPO_URL}\"")), "{page}");
+            assert!(html.contains(&version), "{page}");
+        }
+    }
+}

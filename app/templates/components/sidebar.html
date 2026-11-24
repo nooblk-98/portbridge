@@ -6,9 +6,6 @@
         <div>
             <h1 class="font-heading font-bold text-xl tracking-tight text-slate-900 dark:text-white">Port bridge</h1>
             <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Network Controller</p>
-            <a href="https://github.com/nooblk-98/portbridge/releases" target="_blank" rel="noopener noreferrer"
-                class="text-xs text-slate-500 dark:text-slate-400 hover:underline"
-                x-show="state && state.version" x-text="'v' + state.version"></a>
         </div>
     </div>
 
@@ -35,5 +32,10 @@
             <span class="material-symbols-rounded text-lg" x-text="isDarkMode ? 'light_mode' : 'dark_mode'"></span>
             <span x-text="isDarkMode ? 'Light Mode' : 'Dark Mode'"></span>
         </button>
+        <p class="app-footer">
+            <a href="{{ repo_url }}" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <span aria-hidden="true">&middot;</span>
+            <a href="{{ repo_url }}/releases" target="_blank" rel="noopener noreferrer">v{{ app_version }}</a>
+        </p>
     </div>
 </aside>
