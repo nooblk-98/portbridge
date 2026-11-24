@@ -34,6 +34,17 @@ PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptabl
   </tr>
 </table>
 
+## Architecture
+
+<p align="center">
+  <img src="images/architecture.png" alt="PortBridge architecture: a browser manages PortBridge on a public VPS, which configures WireGuard and iptables; peers behind NAT dial out over the tunnel and public traffic reaches their services through DNAT." width="100%">
+</p>
+
+- **Peers dial out.** Devices behind NAT or CGNAT connect to the server's WireGuard port and keep the tunnel alive, so they need no open inbound port.
+- **The server is the hub.** PortBridge generates the WireGuard config and the iptables rules, and applies them with `wg`, `wg-quick` and `iptables-restore`.
+- **Private routes and public ports.** Peers reach each other and shared subnets over the hub according to each route's access rules. A forwarding rule sends a public port into the tunnel to a service on a peer.
+- **One binary.** An `axum` web server serves the dashboard and JSON API. State lives in JSON files under `DATA_DIR`, and the code behind the `Storage` and `Runner` seams is replaced by fakes in tests.
+
 ## Quick start
 
 You need a server with a public IP or DNS name, and UDP 51820 allowed through its firewall and your provider's.
