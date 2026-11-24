@@ -286,6 +286,7 @@ async fn api_state(State(state): State<AppState>, headers: HeaderMap) -> Respons
             "network": state.config.wg_network.to_string(),
             "clients": clients.get("items").and_then(Value::as_array).map(Vec::len).unwrap_or(0),
             "forwardings": forwardings.len(),
+            "version": crate::version(),
         }))
     })();
     match result {

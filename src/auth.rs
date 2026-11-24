@@ -430,6 +430,85 @@ mod tests {
         assert!(!verify_password_hash("wrong password", &hash));
     }
 
+    fn test_auth() -> Auth {
+        Auth::new(
+            Arc::new(crate::storage::InMemoryStorage::new()),
+            "sessions.json".to_string(),
+            vec![7u8; 32],
+        )
+    }
+
+    fn headers_for(cookies: &[String]) -> HeaderMap {
+        let pairs: Vec<String> = cookies
+            .iter()
+            .map(|cookie| cookie.split(';').next().unwrap().to_string())
+            .collect();
+        let mut headers = HeaderMap::new();
+        headers.insert("cookie", pairs.join("; ").parse().unwrap());
+        headers
+    }
+
+    #[test]
+    fn plaintext_passwords_compare_exactly() {
+        let auth = test_auth();
+        assert!(auth.password_matches("a-long-password", "a-long-password"));
+        assert!(!auth.password_matches("a-long-passworD", "a-long-password"));
+        assert!(!auth.password_matches("short", "a-long-password"));
+    }
+
+    #[test]
+    fn hashed_passwords_are_verified() {
+        let auth = test_auth();
+        let salt = [3u8; SALT_LEN];
+        let hash = format!(
+            "{HASH_PREFIX}$1000${}${}",
+            to_hex(&salt),
+            to_hex(&pbkdf2_sha256(b"right-password", &salt, 1000))
+        );
+        assert!(auth.password_matches("right-password", &hash));
+        assert!(!auth.password_matches("wrong-password", &hash));
+    }
+
+    #[test]
+    fn session_is_bound_to_the_password() {
+        let auth = test_auth();
+        let cookies = auth.login("secret-one").unwrap();
+        let headers = headers_for(&cookies);
+        assert!(auth.authenticate(&headers, "secret-one"));
+        assert!(!auth.authenticate(&headers, "secret-two"));
+    }
+
+    #[test]
+    fn session_expires_after_its_lifetime() {
+        let auth = test_auth();
+        let now = 1_000_000;
+        let cookies = auth.login_at("secret-one", now).unwrap();
+        let headers = headers_for(&cookies[..1]);
+        assert!(auth.authenticate_at(&headers, "secret-one", now + SESSION_TTL - 1));
+        assert!(!auth.authenticate_at(&headers, "secret-one", now + SESSION_TTL + 1));
+    }
+
+    #[test]
+    fn logout_revokes_the_session() {
+        let auth = test_auth();
+        let cookies = auth.login("secret-one").unwrap();
+        let headers = headers_for(&cookies);
+        auth.logout(&headers).unwrap();
+        assert!(!auth.authenticate(&headers, "secret-one"));
+    }
+
+    #[test]
+    fn login_attempts_are_rate_limited_per_address() {
+        let auth = test_auth();
+        let address: IpAddr = "203.0.113.9".parse().unwrap();
+        for _ in 0..MAX_ATTEMPTS {
+            assert!(!auth.is_rate_limited(address));
+        }
+        assert!(auth.is_rate_limited(address));
+        auth.clear_rate_limit(address);
+        assert!(!auth.is_rate_limited(address));
+    }
+
     #[test]
     fn malformed_hashes_are_rejected() {
         assert!(!is_valid_password_hash("pbkdf2-sha256$0$aa$bb"));

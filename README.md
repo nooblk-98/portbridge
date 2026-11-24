@@ -38,6 +38,16 @@ docker compose -f docker-compose-live.yml up -d
 
 To build from a local checkout instead, run `docker compose up -d --build`.
 
+> [!TIP]
+> `lahiru98s/portbridge:latest` follows every release. For predictable upgrades, pin a version tag such as `lahiru98s/portbridge:v1.0.3` in `docker-compose-live.yml`.
+> To keep the plaintext password out of `.env`, generate a hash and set `ADMIN_PASSWORD_HASH` instead of `ADMIN_PASSWORD`:
+>
+> ```sh
+> printf '%s' 'your-long-password' | docker run --rm -i lahiru98s/portbridge portbridge hash-password
+> ```
+>
+> Wrap the hash in single quotes in `.env` (`ADMIN_PASSWORD_HASH='pbkdf2-sha256$...'`) so Compose does not treat `$` as a variable.
+
 > [!NOTE]
 > The dashboard is bound to `127.0.0.1:3000` on the server. Reach it from your computer with an SSH tunnel:
 >

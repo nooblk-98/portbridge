@@ -650,3 +650,78 @@ pub fn next_available_ip(
         .collect();
     host_addresses(network).find(|address| !used.contains(address))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn net(value: &str) -> Ipv4Net {
+        value.parse().unwrap()
+    }
+
+    #[test]
+    fn parse_cidr_accepts_hosts_and_networks() {
+        assert_eq!(
+            parse_cidr("192.168.50.10").unwrap(),
+            net("192.168.50.10/32")
+        );
+        assert_eq!(
+            parse_cidr(" 192.168.50.0/24 ").unwrap(),
+            net("192.168.50.0/24")
+        );
+    }
+
+    #[test]
+    fn parse_cidr_rejects_bad_input() {
+        for value in ["", "10.0.0.1/24", "300.1.1.1", "10.0.0.0/40", "abc"] {
+            assert!(parse_cidr(value).is_err(), "{value}");
+        }
+    }
+
+    #[test]
+    fn overlap_detects_nesting_both_ways() {
+        assert!(networks_overlap(net("10.0.0.0/8"), net("10.1.2.3/32")));
+        assert!(networks_overlap(net("10.1.2.3/32"), net("10.0.0.0/8")));
+        assert!(!networks_overlap(net("10.0.0.0/24"), net("10.0.1.0/24")));
+    }
+
+    #[test]
+    fn only_private_and_shared_ranges_are_allowed() {
+        assert!(is_private(net("192.168.1.0/24")));
+        assert!(is_private(net("172.16.5.5/32")));
+        assert!(is_private(net("100.64.1.0/24")));
+        assert!(!is_private(net("8.8.8.8/32")));
+        assert!(!is_private(net("10.0.0.0/7")));
+    }
+
+    fn client(name: &str, key: &str, address: &str) -> Client {
+        Client {
+            name: name.to_string(),
+            address: address.to_string(),
+            private_key: String::new(),
+            public_key: key.to_string(),
+            created_at: 0,
+            extra: Map::new(),
+        }
+    }
+
+    #[test]
+    fn route_owner_never_receives_own_route() {
+        let owner = client("owner", "key-a", "10.8.0.2/32");
+        let other = client("other", "key-b", "10.8.0.3/32");
+        let clients = vec![owner.clone(), other.clone()];
+        assert!(!may_receive_route(
+            &owner,
+            &owner,
+            "192.168.50.0/24",
+            &clients
+        ));
+        // No stored access entry means every other peer may use the route.
+        assert!(may_receive_route(
+            &other,
+            &owner,
+            "192.168.50.0/24",
+            &clients
+        ));
+    }
+}

@@ -213,3 +213,87 @@ pub fn protocols_overlap(existing: &str, new: &str) -> bool {
     let new = new.to_lowercase();
     existing == "both" || new == "both" || existing == new
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn joined(command: &IptablesCommand) -> String {
+        format!("{} {}", command.table, command.args.join(" "))
+    }
+
+    #[test]
+    fn renders_single_tcp_rule() {
+        let rule =
+            json!({"port": 8080, "protocol": "tcp", "client_ip": "10.8.0.2", "target_port": 80});
+        let commands = render_rule(&rule, "eth0");
+        assert_eq!(commands.len(), 2);
+        assert_eq!(
+            joined(&commands[0]),
+            "nat -i eth0 -p tcp --dport 8080 -j DNAT --to-destination 10.8.0.2:80"
+        );
+        assert_eq!(commands[1].table, "filter");
+        assert!(joined(&commands[1]).contains("-d 10.8.0.2 --dport 80"));
+    }
+
+    #[test]
+    fn both_protocol_renders_tcp_and_udp() {
+        let rule = json!({"port": "53", "protocol": "both", "client_ip": "10.8.0.3"});
+        let commands = render_rule(&rule, "eth0");
+        assert_eq!(commands.len(), 4);
+        assert!(joined(&commands[0]).contains("-p tcp"));
+        assert!(joined(&commands[2]).contains("-p udp"));
+        // The target port defaults to the public port.
+        assert!(joined(&commands[0]).ends_with("10.8.0.3:53"));
+    }
+
+    #[test]
+    fn source_restriction_is_applied_to_both_chains() {
+        let rule = json!({"port": 22, "protocol": "tcp", "client_ip": "10.8.0.4", "source_ip": "203.0.113.0/24"});
+        let commands = render_rule(&rule, "eth0");
+        assert!(commands
+            .iter()
+            .all(|c| c.args.join(" ").contains("-s 203.0.113.0/24")));
+    }
+
+    #[test]
+    fn port_ranges_need_ordered_bounds() {
+        let ok = json!({"port": "30000-30010", "protocol": "udp", "client_ip": "10.8.0.5"});
+        assert!(rule_is_valid(&ok));
+        assert!(joined(&render_rule(&ok, "eth0")[0]).contains("--dport 30000:30010"));
+        let reversed = json!({"port": "30010-30000", "client_ip": "10.8.0.5"});
+        assert!(!rule_is_valid(&reversed));
+    }
+
+    #[test]
+    fn invalid_rules_render_nothing() {
+        for rule in [
+            json!({"port": 0, "client_ip": "10.8.0.2"}),
+            json!({"port": 80, "protocol": "icmp", "client_ip": "10.8.0.2"}),
+            json!({"port": 80, "client_ip": "not-an-ip"}),
+            json!({"port": 80, "client_ip": "10.8.0.2", "source_ip": "bogus"}),
+            json!({"client_ip": "10.8.0.2"}),
+        ] {
+            assert!(!rule_is_valid(&rule), "{rule}");
+            assert!(render_rule(&rule, "eth0").is_empty(), "{rule}");
+        }
+    }
+
+    #[test]
+    fn protocol_overlap_rules() {
+        assert!(protocols_overlap("tcp", "TCP"));
+        assert!(protocols_overlap("both", "udp"));
+        assert!(!protocols_overlap("tcp", "udp"));
+    }
+
+    #[test]
+    fn lenient_network_parsing() {
+        assert_eq!(
+            parse_ipv4_network_lenient(" 192.0.2.1 ").map(|n| n.to_string()),
+            Some("192.0.2.1/32".to_string())
+        );
+        assert!(parse_ipv4_network_lenient("").is_none());
+        assert!(parse_ipv4_network_lenient("10.0.0.0/33").is_none());
+    }
+}

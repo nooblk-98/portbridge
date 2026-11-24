@@ -182,6 +182,38 @@ if [[ -z $source_dir || ! -f $source_dir/app/templates/login.html || ! -f $sourc
     die "The installer is missing the dashboard files (app/templates and app/static). Use a complete release archive or repository checkout."
 fi
 
+write_unit() {
+cat > "$unit" <<'UNIT'
+[Unit]
+Description=PortBridge WireGuard dashboard
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+WorkingDirectory=/opt/portbridge
+EnvironmentFile=/etc/portbridge/portbridge.env
+# Keep the shared iptables lock usable inside the read-only mount namespace.
+ExecStartPre=+/usr/bin/touch /run/xtables.lock
+ExecStart=/opt/portbridge/portbridge
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/etc/portbridge /var/lib/portbridge -/run/xtables.lock
+ExecStopPost=-/usr/bin/wg-quick down /etc/portbridge/pb0.conf
+UMask=0077
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+chmod 0644 "$unit"
+}
+
 if [[ $mode == upgrade ]]; then
     # Replace the program and dashboard files; settings, peers and keys stay.
     stage=$app_dir/.upgrade.$$
@@ -193,6 +225,8 @@ if [[ $mode == upgrade ]]; then
     mv "$app_dir/app" "$app_dir/app.old"
     mv "$stage/app" "$app_dir/app"
     rm -rf "$stage" "$app_dir/app.old"
+    write_unit
+    systemctl daemon-reload </dev/null
     systemctl restart portbridge.service </dev/null
     systemctl is-active --quiet portbridge.service </dev/null
     echo "PortBridge was upgraded to $("$app_dir/portbridge" --version </dev/null) and restarted."
@@ -242,31 +276,7 @@ APP_HOST=127.0.0.1
 APP_PORT=3000
 ENV
 
-cat > "$unit" <<'UNIT'
-[Unit]
-Description=PortBridge WireGuard dashboard
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-WorkingDirectory=/opt/portbridge
-EnvironmentFile=/etc/portbridge/portbridge.env
-# Keep the shared iptables lock usable inside the read-only mount namespace.
-ExecStartPre=+/usr/bin/touch /run/xtables.lock
-ExecStart=/opt/portbridge/portbridge
-NoNewPrivileges=true
-ProtectHome=true
-ProtectSystem=strict
-ReadWritePaths=/etc/portbridge /var/lib/portbridge -/run/xtables.lock
-ExecStopPost=-/usr/bin/wg-quick down /etc/portbridge/pb0.conf
-UMask=0077
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-chmod 0644 "$unit"
-systemctl daemon-reload
+write_unit
 systemctl daemon-reload
 systemctl enable --now portbridge.service
 systemctl is-active --quiet portbridge.service

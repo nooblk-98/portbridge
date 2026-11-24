@@ -15,6 +15,12 @@ on:
 permissions:
   contents: read
 
+# Builds push :latest, so run them one at a time and let the newest
+# queued release win instead of racing an older build.
+concurrency:
+  group: docker-publish
+  cancel-in-progress: false
+
 env:
   DOCKERHUB: lahiru98s
 
