@@ -1,0 +1,14 @@
+{
+  "name": "portbridge-ui",
+  "private": true,
+  "description": "Build tooling for the PortBridge dashboard stylesheet. The built CSS is committed, so running the server needs no Node.",
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i src/tailwind.css -o ../app/static/css/tailwind.css --minify",
+    "watch:css": "tailwindcss -c tailwind.config.js -i src/tailwind.css -o ../app/static/css/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/forms": "0.5.10",
+    "@tailwindcss/typography": "0.5.16",
+    "tailwindcss": "3.4.17"
+  }
+}

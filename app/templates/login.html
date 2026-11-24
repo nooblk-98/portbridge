@@ -21,7 +21,7 @@
     <!-- Tailwind CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
     <!-- Alpine.js -->
-    <script defer src="{{ url_for('static', filename='js/alpine-3.14.9.min.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='vendor/alpine-3.14.9.min.js') }}"></script>
 </head>
 
 <body
@@ -65,11 +65,7 @@
         <div
             class="bg-gray-50 dark:bg-slate-800/50 px-8 py-4 text-center border-t border-gray-100 dark:border-dark-border">
             <p class="text-xs text-slate-400">PortBridge &copy; <span x-text="new Date().getFullYear()"></span></p>
-            <p class="app-footer">
-                <a href="{{ repo_url }}" target="_blank" rel="noopener noreferrer">GitHub</a>
-                <span aria-hidden="true">&middot;</span>
-                <a href="{{ repo_url }}/releases" target="_blank" rel="noopener noreferrer">v{{ app_version }}</a>
-            </p>
+            {% include "components/footer.html" %}
         </div>
     </div>
 

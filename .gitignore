@@ -50,3 +50,6 @@ skills-lock.json
 /target/
 
 /.venv/
+
+# Node (UI build tooling only)
+node_modules/

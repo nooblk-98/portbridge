@@ -664,11 +664,15 @@ mod footer_tests {
     }
 
     #[test]
-    fn dashboard_and_login_footers_link_the_repo_and_version() {
+    fn dashboard_and_login_footers_link_the_repo_version_and_author() {
         let version = format!("v{}", crate::version());
         for page in ["index.html", "login.html"] {
             let html = render_page(page);
-            assert!(html.contains("class=\"app-footer\""), "{page}");
+            assert!(html.contains("Made with"), "{page}");
+            assert!(
+                html.contains("href=\"https://github.com/nooblk-98\""),
+                "{page}"
+            );
             assert!(html.contains(&format!("href=\"{REPO_URL}\"")), "{page}");
             assert!(html.contains(&version), "{page}");
         }

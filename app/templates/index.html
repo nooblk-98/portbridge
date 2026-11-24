@@ -6,19 +6,6 @@
 
     {% include "components/sidebar.html" %}
 
-    <!-- Mobile Header -->
-    <header
-        class="md:hidden flex flex-shrink-0 items-center gap-2 h-16 bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border px-4">
-        <button type="button" @click="mobileMenuOpen = !mobileMenuOpen"
-            aria-label="Open navigation menu" aria-controls="mobile-menu" :aria-expanded="mobileMenuOpen"
-            class="p-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800">
-            <span class="material-symbols-rounded text-2xl" aria-hidden="true">menu</span>
-        </button>
-        <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="" width="40" height="40"
-            class="w-10 h-10 flex-shrink-0 rounded-full">
-        <span class="font-heading font-bold text-lg text-slate-900 dark:text-white">Port bridge</span>
-    </header>
-
     <!-- Mobile Menu Overlay -->
     <div x-show="mobileMenuOpen" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 z-40 md:hidden"
         @click="mobileMenuOpen = false"></div>
@@ -46,17 +33,38 @@
         {% include "components/sidebar-actions.html" %}
     </div>
 
+    <!-- Content column: header (mobile), scrolling page, one footer. -->
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+        <!-- Mobile Header -->
+        <header
+            class="md:hidden flex flex-shrink-0 items-center gap-2 h-16 bg-white dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border px-4">
+            <button type="button" @click="mobileMenuOpen = !mobileMenuOpen"
+                aria-label="Open navigation menu" aria-controls="mobile-menu" :aria-expanded="mobileMenuOpen"
+                class="p-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800">
+                <span class="material-symbols-rounded text-2xl" aria-hidden="true">menu</span>
+            </button>
+            <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="" width="40" height="40"
+                class="w-10 h-10 flex-shrink-0 rounded-full">
+            <span class="font-heading font-bold text-lg text-slate-900 dark:text-white">Port bridge</span>
+        </header>
+
     <!-- Main Content -->
-    <main
-        class="flex-1 overflow-y-auto bg-gray-50 dark:bg-dark-bg transition-colors duration-300 relative">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {% include "components/import-notice.html" %}
-            {% include "components/dashboard.html" %}
-            {% include "components/clients.html" %}
-            {% include "components/routes.html" %}
-            {% include "components/forwarding.html" %}
-        </div>
-    </main>
+        <main
+            class="flex-1 overflow-y-auto bg-gray-50 dark:bg-dark-bg transition-colors duration-300 relative">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {% include "components/import-notice.html" %}
+                {% include "components/dashboard.html" %}
+                {% include "components/clients.html" %}
+                {% include "components/routes.html" %}
+                {% include "components/forwarding.html" %}
+            </div>
+        </main>
+
+        <footer
+            class="flex-shrink-0 border-t border-gray-200 bg-white px-4 py-2 dark:border-dark-border dark:bg-dark-surface">
+            {% include "components/footer.html" %}
+        </footer>
+    </div>
 
 </div>
 
