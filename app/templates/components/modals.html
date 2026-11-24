@@ -402,12 +402,12 @@
                 <div class="pb-setting__text">
                     <label for="peer-local-access" class="pb-label">Server access</label>
                     <p id="peer-local-access-help" class="pb-hint pb-hint--tight">
-                        <strong>On:</strong> the PortBridge server, and programs running on it such as a Docker reverse
-                        proxy or <code>curl</code>, can connect to the services running on this peer and the
-                        networks it advertises. <strong>Off (the default):</strong> the PortBridge server cannot
-                        start connections to this peer. Other peers can still reach it over the tunnel (route access
-                        applies to advertised networks), forwarded public ports still work, and the device's profile
-                        does not change.
+                        <strong>On:</strong> Docker containers and other traffic forwarded through the PortBridge server,
+                        such as a reverse proxy, can connect to the services running on this peer and the networks it
+                        advertises. <strong>Off (the default):</strong> they cannot. Other peers can still reach it over
+                        the tunnel (route access applies to advertised networks) and forwarded public ports still work.
+                        Programs run directly on the server (a shell, <code>curl</code>, <code>ssh</code>) are not
+                        restricted by this switch. The device's profile does not change.
                     </p>
                 </div>
                 <input id="peer-local-access" type="checkbox" switch role="switch" class="pb-switch"

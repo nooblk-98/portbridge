@@ -216,7 +216,7 @@ impl Config {
             static_dir,
             // Peers may reach the internet through the server unless this is
             // switched off with ALLOW_INTERNET_EGRESS=0.
-            // Programs on the PortBridge hosted server, such as a Docker reverse proxy,
+            // Docker containers and other traffic forwarded through the PortBridge server
             // may reach a peer only when it is switched on for that peer. This is the
             // default for peers without a setting; ALLOW_LOCAL_TO_PEERS=1 makes it on.
             allow_local_to_peers: matches!(

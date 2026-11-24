@@ -268,8 +268,8 @@ impl IPTablesService {
     /// The rules that end the forwarding chain.
     ///
     /// Everything that enters or leaves the tunnel and was not accepted above is
-    /// dropped, except that programs on this server (a Docker reverse proxy, for
-    /// example) may open connections to the peers that allow it, and those peers
+    /// dropped, except that forwarded traffic from this server's other interfaces (a
+    /// Docker reverse proxy, for example) may open connections to the peers that allow it, and those peers
     /// may answer. A peer allows it when its own setting says so, or, if it has
     /// none, when `allow_local_to_peers` is on. Peers still cannot start
     /// connections to this server's other services or reach each other outside
