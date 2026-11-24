@@ -1,4 +1,4 @@
-<div x-show="currentTab === 'dashboard'" x-transition:enter="transition ease-out duration-300"
+<div x-show="currentTab === 'dashboard'" x-cloak x-transition:enter="transition ease-out duration-300"
     x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
     <header class="mb-8">
         <h2 class="text-3xl font-heading font-bold text-slate-900 dark:text-white">Dashboard</h2>
@@ -15,7 +15,7 @@
             </div>
             <div class="relative z-10">
                 <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Clients</p>
-                <h3 class="text-3xl font-bold text-slate-900 dark:text-white mt-1" x-text="state.clients || 0">0</h3>
+                <h3 class="text-3xl font-bold text-slate-900 dark:text-white mt-1" x-text="clientsReady ? clients.length : '—'">—</h3>
                 <div class="mt-4 flex items-center text-sm text-emerald-600 dark:text-emerald-400 font-medium">
                     <span class="material-symbols-rounded text-lg mr-1">check_circle</span>
                     <span>Active Network</span>
@@ -31,7 +31,7 @@
             </div>
             <div class="relative z-10">
                 <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Active Ports</p>
-                <h3 class="text-3xl font-bold text-slate-900 dark:text-white mt-1" x-text="state.forwardings || 0">0
+                <h3 class="text-3xl font-bold text-slate-900 dark:text-white mt-1" x-text="forwardingsReady && !forwardingError ? forwardings.length : '—'">—
                 </h3>
                 <div class="mt-4 flex items-center text-sm text-orange-600 dark:text-orange-400 font-medium">
                     <span class="material-symbols-rounded text-lg mr-1">arrow_forward</span>
@@ -52,13 +52,11 @@
                 <div class="mt-2 space-y-2">
                     <div class="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-800/50 rounded-lg">
                         <span class="text-xs font-bold text-slate-500 uppercase">Interface</span>
-                        <span class="font-mono text-sm font-semibold text-slate-700 dark:text-slate-300"
-                            x-text="state.interface">wg0</span>
+                        <span class="font-mono text-sm font-semibold text-slate-700 dark:text-slate-300">{{ wg_interface }}</span>
                     </div>
                     <div class="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-800/50 rounded-lg">
                         <span class="text-xs font-bold text-slate-500 uppercase">Subnet</span>
-                        <span class="font-mono text-sm font-semibold text-slate-700 dark:text-slate-300"
-                            x-text="state.network">10.8.0.0/24</span>
+                        <span class="font-mono text-sm font-semibold text-slate-700 dark:text-slate-300">{{ wg_network }}</span>
                     </div>
                 </div>
             </div>
@@ -67,10 +65,12 @@
 
     <!-- Live status -->
     <div class="pb-dash mb-8">
+    <p x-show="!stats && !statsError" role="status" class="pb-hint">Loading live statistics…</p>
+    <p x-show="statsError" role="alert" class="pb-hint" x-text="statsError"></p>
     <div class="pb-dash-grid">
 
         <!-- Peers online -->
-        <section class="pb-panel pb-span-4" aria-labelledby="pb-peers-title">
+        <section x-show="stats" class="pb-panel pb-span-4" aria-labelledby="pb-peers-title">
             <header class="pb-panel__head">
                 <span class="pb-panel__icon pb-tint-emerald"><span class="material-symbols-rounded">groups</span></span>
                 <h3 id="pb-peers-title" class="pb-panel__title">Peers online</h3>
@@ -111,7 +111,7 @@
         </section>
 
         <!-- Total traffic -->
-        <section class="pb-panel pb-span-4" aria-labelledby="pb-traffic-title">
+        <section x-show="stats" class="pb-panel pb-span-4" aria-labelledby="pb-traffic-title">
             <header class="pb-panel__head">
                 <span class="pb-panel__icon pb-tint-sky"><span class="material-symbols-rounded">swap_vert</span></span>
                 <h3 id="pb-traffic-title" class="pb-panel__title">Total traffic</h3>
@@ -143,7 +143,7 @@
         </section>
 
         <!-- Connection health -->
-        <section class="pb-panel pb-span-4 pb-wide-mid" aria-labelledby="pb-health-title">
+        <section x-show="stats" class="pb-panel pb-span-4 pb-wide-mid" aria-labelledby="pb-health-title">
             <header class="pb-panel__head">
                 <span class="pb-panel__icon pb-tint-violet"><span class="material-symbols-rounded">monitor_heart</span></span>
                 <h3 id="pb-health-title" class="pb-panel__title">Connection health</h3>
@@ -183,10 +183,12 @@
                 <span class="pb-muted" x-text="chartSummary"></span>
             </div>
             <div class="pb-chart">
-                <canvas x-ref="trafficCanvas" role="img"
+                <canvas x-show="history" x-ref="trafficCanvas" role="img"
                     aria-label="Download and upload traffic over the selected period"></canvas>
-                <p class="pb-chart__empty pb-muted" x-show="history && chartIsEmpty">No traffic recorded in this period yet.</p>
+                <p class="pb-chart__empty pb-muted" role="status" x-show="!history && !historyError">Loading traffic history…</p>
+                <p class="pb-chart__empty pb-muted" x-show="history && chartIsEmpty && !historyError">No traffic recorded in this period yet.</p>
             </div>
+            <p x-show="historyError" role="alert" class="pb-hint" x-text="historyError"></p>
         </section>
 
         <!-- Top talkers -->
@@ -216,12 +218,12 @@
                         </div>
                     </li>
                 </template>
-                <li x-show="talkers.length === 0" class="pb-muted">No traffic recorded in this period yet.</li>
+                <li x-show="history && talkers.length === 0" class="pb-muted">No traffic recorded in this period yet.</li>
             </ol>
         </section>
 
         <!-- Server -->
-        <section class="pb-panel pb-span-12" aria-labelledby="pb-server-title">
+        <section x-show="stats" class="pb-panel pb-span-12" aria-labelledby="pb-server-title">
             <header class="pb-panel__head">
                 <span class="pb-panel__icon pb-tint-rose"><span class="material-symbols-rounded">dns</span></span>
                 <h3 id="pb-server-title" class="pb-panel__title">Server</h3>

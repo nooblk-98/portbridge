@@ -43,6 +43,8 @@ pub fn templates(config: &Config) -> Environment<'static> {
     environment.set_loader(path_loader(config.template_dir.clone()));
     // Shown in the dashboard and sign-in footers.
     environment.add_global("app_version", crate::version());
+    environment.add_global("wg_interface", config.wg_interface.clone());
+    environment.add_global("wg_network", config.wg_network.to_string());
     // A constant URL, so it is safe to emit without HTML escaping its slashes.
     environment.add_global(
         "repo_url",
@@ -107,23 +109,30 @@ pub fn router(state: AppState) -> Router {
 }
 
 async fn security_headers(State(state): State<AppState>, request: Request, next: Next) -> Response {
-    let path = request.uri().path().to_string();
-    let authenticated = state
-        .auth
-        .authenticate(request.headers(), &state.config.admin_password);
-    let token = if authenticated {
-        state
-            .auth
-            .session_token(request.headers(), &state.config.admin_password)
-    } else {
-        None
-    };
+    let is_static = request.uri().path().starts_with("/static/");
+    let token = (!is_static)
+        .then(|| {
+            state
+                .auth
+                .session_token(request.headers(), &state.config.admin_password)
+        })
+        .flatten();
     let mut response = next.run(request).await;
     response.headers_mut().insert(
         header::CONTENT_SECURITY_POLICY,
         HeaderValue::from_static(CSP),
     );
-    if !path.starts_with("/static") {
+    if is_static {
+        if response.status().is_success() || response.status() == StatusCode::NOT_MODIFIED {
+            response.headers_mut().insert(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("public, no-cache"),
+            );
+        }
+    } else {
+        response
+            .headers_mut()
+            .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
         response
             .headers_mut()
             .insert(header::VARY, HeaderValue::from_static("Cookie"));

@@ -8,14 +8,17 @@
                 profiles need a fresh export</p>
         </div>
         <div>
-            <button type="button" @click="loadData()" class="pb-button">
+            <button type="button" @click="loadData()" :disabled="dataRefreshing" class="pb-button">
                 <span class="material-symbols-rounded" aria-hidden="true">refresh</span>
                 Refresh
             </button>
         </div>
     </header>
 
-    <dl class="pb-summary" aria-label="Route summary">
+    <p x-show="!clientsReady && !clientsError" role="status" class="pb-hint">Loading routes…</p>
+    <p x-show="clientsError" role="alert" class="pb-hint" x-text="clientsError"></p>
+
+    <dl x-show="clientsReady" class="pb-summary" aria-label="Route summary">
         <div class="pb-summary__item">
             <dt>Advertised routes</dt>
             <dd x-text="routesAvailable ? routeRows.length : '—'">—</dd>
@@ -34,7 +37,7 @@
         </div>
     </dl>
 
-    <section class="pb-card" aria-labelledby="route-status-title">
+    <section x-show="clientsReady" class="pb-card" aria-labelledby="route-status-title">
         <div class="pb-card__head">
             <h3 id="route-status-title" class="pb-card__title">Route status</h3>
             <p class="pb-hint">
@@ -132,7 +135,7 @@
         </ul>
     </section>
 
-    <section class="pb-card" aria-labelledby="profile-status-title">
+    <section x-show="clientsReady" class="pb-card" aria-labelledby="profile-status-title">
         <div class="pb-card__head">
             <h3 id="profile-status-title" class="pb-card__title">Split-tunnel profiles</h3>
             <p class="pb-hint">

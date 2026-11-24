@@ -14,9 +14,10 @@
         </button>
     </header>
 
+    <p x-show="!forwardingsReady && !forwardingError" role="status" class="pb-hint">Loading forwarding rules…</p>
     <p x-show="forwardingError" role="alert" class="pb-hint" x-text="forwardingError"></p>
 
-    <div x-show="!forwardingError"
+    <div x-show="forwardingsReady && !forwardingError"
         class="bg-white dark:bg-dark-surface rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
