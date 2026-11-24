@@ -69,7 +69,7 @@ test.describe("static files", () => {
     );
     expect(addresses.length).toBeGreaterThanOrEqual(8);
     for (const address of addresses) {
-      expect(address, address).toMatch(/\?v=\d+\.\d+\.\d+$/);
+      expect(address, address).toMatch(/\?v=\d+\.\d+\.\d+(-[\w.]+)?$/);
       expect((await page.request.get(address)).status(), address).toBe(200);
     }
   });

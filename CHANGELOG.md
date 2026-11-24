@@ -7,6 +7,15 @@ notes for its version.
 
 ## [1.6.1] - 2026-11-24
 
+### Changed
+
+- **Versioned files are cached for a year.** Static files requested with the
+  running release's number (`?v=1.6.1`) are sent with `immutable` and a one-year
+  lifetime, so pages load without checking the server for every script and style.
+  Anything else, and every development build, is still revalidated each time.
+- **A development build says so.** A build that is not a release reports
+  `0.0.0-dev` instead of the made-up `0.1.0`, in the footer and `--version`.
+
 ### Fixed
 
 - **Upgrades no longer show an old stylesheet behind a caching proxy.** A reverse
