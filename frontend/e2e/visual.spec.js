@@ -7,7 +7,6 @@ const { test, expect } = require("@playwright/test");
 const { isMobile, openPage, clearImportNotices } = require("./helpers");
 
 test.skip(!process.env.VISUAL, "set VISUAL=1 to run the screenshot comparison");
-test.describe.configure({ mode: "serial" });
 
 const THEMES = ["light", "dark"];
 const SHOT = { animations: "disabled", maxDiffPixelRatio: 0.002, threshold: 0.15 };

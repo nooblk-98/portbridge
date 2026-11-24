@@ -5,6 +5,19 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.4.3] - 2026-11-24
+
+### Changed
+
+- **The whole UI is styled with Tailwind.** The 1,700-line hand-written
+  `style.css` is gone: every style is a utility class in the templates, shared
+  styles live in one `ui.html` partial, and the theme is defined in the Tailwind
+  config. The look is unchanged, except that the dashboard rings now turn amber
+  or red as their tone intends (an old stylesheet ordering bug kept them green).
+- **Browser end-to-end tests.** About 55 Playwright tests drive the real
+  dashboard at desktop and phone sizes against fixture data and a fake
+  WireGuard runner, and run in CI. Icon-only buttons gained accessible names.
+
 ## [1.4.2] - 2026-11-24
 
 ### Added

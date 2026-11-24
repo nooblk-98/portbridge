@@ -10,15 +10,22 @@ needs no Node.
 | Path | What |
 | --- | --- |
 | `app/templates/` | Jinja pages and `components/` partials |
-| `app/static/js/` | Our own scripts (`app.js`, `login.js`, `route-access.js`, `theme.js`) |
-| `app/static/css/style.css` | Hand-written component styles (`pb-*`) |
+| `app/static/js/` | Our own scripts (`app.js`, `login.js`, `route-access.js`, `theme.js`, `tones.js`) |
 | `app/static/css/tailwind.css` | **Generated**. Do not edit by hand |
 | `app/static/vendor/` | Vendored third-party bundles and their licences |
 | `frontend/` | Tailwind config, input CSS and `package.json` |
 
 ## Changing styles
 
-Use Tailwind utility classes in the templates. After adding or removing classes:
+The whole UI is styled with Tailwind utility classes in the templates; there is no
+hand-written stylesheet. A style that several templates share is written once in
+`app/templates/components/ui.html` (a dictionary of class strings plus a few
+macros). Classes that depend on state (a status colour, a health level) live in
+`app/static/js/tones.js`, written out in full so the build can find them. The
+theme colours that change with light and dark mode are CSS variables in
+`frontend/src/tailwind.css`, exposed as `ui-*` and `db-*` colours in the config.
+
+After adding or removing classes:
 
 ```sh
 cd frontend

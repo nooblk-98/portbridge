@@ -1,3 +1,14 @@
+{% from "components/ui.html" import ui, panel_head %}
+{# Column spans follow the width of the content area (a container query), so the
+   layout adapts whether or not the sidebar is showing. #}
+{% set third = "col-span-12 @[640px]:col-span-6 @[1000px]:col-span-4" %}
+{# A list that would sit alone in a half-width column takes a full row and flows into
+   two columns, until the panel is wide enough to share a row again. #}
+{% set third_wide = "col-span-12 @[1000px]:col-span-4" %}
+{% set checks_columns = "@[640px]:grid @[640px]:grid-cols-2 @[640px]:gap-x-8 @[640px]:gap-y-3.5 @[1000px]:flex @[1000px]:gap-y-3" %}
+{% set talkers_columns = "@[640px]:grid @[640px]:grid-cols-2 @[640px]:gap-x-8 @[640px]:gap-y-3.5 @[1000px]:flex @[1000px]:gap-y-4" %}
+{% set chart_empty = "pointer-events-none absolute inset-0 m-0 flex items-center justify-center text-[0.8125rem] text-db-muted" %}
+{% set gauge_name = "inline-flex items-center gap-1.5 text-sm font-semibold leading-normal" %}
 <div x-show="currentTab === 'dashboard'" x-cloak x-transition:enter="transition ease-out duration-300"
     x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
     <header class="mb-8">
@@ -64,205 +75,196 @@
     </div>
 
     <!-- Live status -->
-    <div class="pb-dash mb-8">
-    <p x-show="!stats && !statsError" role="status" class="pb-hint">Loading live statistics…</p>
-    <p x-show="statsError" role="alert" class="pb-hint" x-text="statsError"></p>
-    <div class="pb-dash-grid">
+    <div class="@container mb-8">
+        <p x-show="!stats && !statsError" role="status" class="{{ ui.hint }}">Loading live statistics…</p>
+        <p x-show="statsError" role="alert" class="{{ ui.hint }}" x-text="statsError"></p>
+        <div class="grid grid-cols-12 gap-6">
 
-        <!-- Peers online -->
-        <section x-show="stats" class="pb-panel pb-span-4" aria-labelledby="pb-peers-title">
-            <header class="pb-panel__head">
-                <span class="pb-panel__icon pb-tint-emerald"><span class="material-symbols-rounded">groups</span></span>
-                <h3 id="pb-peers-title" class="pb-panel__title">Peers online</h3>
-            </header>
-            <div class="pb-split">
-                <div class="pb-ring" :class="peersTone" role="img"
-                    :aria-label="peersOnline + ' of ' + peersTotal + ' peers online'">
-                    <svg viewBox="0 0 120 120" aria-hidden="true">
-                        <circle class="pb-ring__track" cx="60" cy="60" r="50" />
-                        <circle class="pb-ring__value" cx="60" cy="60" r="50" :stroke-dasharray="ringDash(peersOnlinePct)" />
-                    </svg>
-                    <div class="pb-ring__label">
-                        <strong x-text="peersOnline"></strong>
-                        <span x-text="'of ' + peersTotal"></span>
+            <!-- Peers online -->
+            <section x-show="stats" class="{{ ui.panel }} {{ third }}" aria-labelledby="peers-title">
+                {{ panel_head("peers-title", "Peers online", "groups", "emerald") }}
+                <div class="flex flex-1 items-center gap-5">
+                    <div class="relative h-[7.5rem] w-[7.5rem] flex-none" :class="peersTone" role="img"
+                        :aria-label="peersOnline + ' of ' + peersTotal + ' peers online'">
+                        <svg viewBox="0 0 120 120" class="h-full w-full -rotate-90" aria-hidden="true">
+                            <circle class="{{ ui.ring_track }}" cx="60" cy="60" r="50" />
+                            <circle class="{{ ui.ring_value }}" :class="ringDash(peersOnlinePct).startsWith('0 ') ? 'invisible' : ''"
+                                cx="60" cy="60" r="50" :stroke-dasharray="ringDash(peersOnlinePct)" />
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center leading-[1.1]">
+                            <strong class="text-[1.75rem] font-bold text-db-fg" x-text="peersOnline"></strong>
+                            <span class="mt-0.5 text-[0.75rem] text-db-muted" x-text="'of ' + peersTotal"></span>
+                        </div>
+                    </div>
+                    <ul class="m-0 min-w-0 flex-1 list-none p-0">
+                        <template x-for="peer in peerRowsShown" :key="peer.public_key">
+                            <li class="flex items-center gap-3 py-1.5">
+                                <span class="relative h-8 w-8 flex-none">
+                                    <img :src="avatarFor(peer)" alt="" width="32" height="32" class="h-8 w-8 rounded-full"
+                                        :class="peer.online ? '' : 'opacity-75 grayscale-[0.85]'">
+                                    <span class="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-db-panel"
+                                        :class="peer.online ? 'bg-db-ok' : 'bg-slate-400'"></span>
+                                </span>
+                                <span class="flex min-w-0 flex-col">
+                                    <span class="truncate text-sm font-semibold leading-normal" x-text="peer.name"></span>
+                                    <span class="text-xs leading-normal text-db-muted"
+                                        x-text="peer.online ? 'Connected' : (peer.last_handshake ? 'Seen ' + formatTime(peer.last_handshake) : 'Never connected')"></span>
+                                </span>
+                            </li>
+                        </template>
+                        <li x-show="peersHidden > 0" class="pl-11 pt-1 text-xs font-semibold leading-normal">
+                            <a href="/clients" @click.prevent="currentTab = 'clients'"
+                                class="text-db-accent no-underline hover:underline focus-visible:underline"
+                                x-text="'+' + peersHidden + ' more'"></a>
+                        </li>
+                        <li x-show="peerRows.length === 0" class="{{ ui.muted }}">No peers yet. Add a client to get started.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Total traffic -->
+            <section x-show="stats" class="{{ ui.panel }} {{ third }}" aria-labelledby="traffic-title">
+                {{ panel_head("traffic-title", "Total traffic", "swap_vert", "sky") }}
+                <div class="flex flex-1 flex-col justify-center">
+                    <div class="mb-5 grid grid-cols-2 gap-4">
+                        <div class="flex min-w-0 flex-col gap-1">
+                            <span class="inline-flex items-center gap-1 text-[0.8125rem] font-medium text-db-muted"><span class="material-symbols-rounded text-[1.125rem] text-db-down">arrow_downward</span>Download</span>
+                            <strong class="text-[1.75rem] font-bold leading-[1.15] text-db-fg" x-text="formatBytes(stats?.traffic?.download_total)"></strong>
+                            <span class="text-xs leading-normal text-db-muted" x-text="'Last 24 h: ' + formatBytes(stats?.traffic?.last_24h?.download)"></span>
+                        </div>
+                        <div class="flex min-w-0 flex-col gap-1">
+                            <span class="inline-flex items-center gap-1 text-[0.8125rem] font-medium text-db-muted"><span class="material-symbols-rounded text-[1.125rem] text-db-up">arrow_upward</span>Upload</span>
+                            <strong class="text-[1.75rem] font-bold leading-[1.15] text-db-fg" x-text="formatBytes(stats?.traffic?.upload_total)"></strong>
+                            <span class="text-xs leading-normal text-db-muted" x-text="'Last 24 h: ' + formatBytes(stats?.traffic?.last_24h?.upload)"></span>
+                        </div>
+                    </div>
+                    <div class="flex h-2 overflow-hidden rounded-full bg-db-track" role="img"
+                        :aria-label="'Download ' + downloadShare + ' percent, upload ' + uploadShare + ' percent'">
+                        <span class="bg-db-down [transition:width_0.6s_ease] motion-reduce:transition-none" :style="{ width: downloadShare + '%' }"></span>
+                        <span class="bg-db-up [transition:width_0.6s_ease] motion-reduce:transition-none" :style="{ width: uploadShare + '%' }"></span>
+                    </div>
+                    <div class="mt-2.5 flex flex-wrap justify-between gap-4 text-xs leading-normal text-db-muted">
+                        <span><i class="{{ ui.swatch }} bg-db-down"></i>Download <b class="text-db-fg" x-text="downloadShare + '%'"></b></span>
+                        <span><i class="{{ ui.swatch }} bg-db-up"></i>Upload <b class="text-db-fg" x-text="uploadShare + '%'"></b></span>
                     </div>
                 </div>
-                <ul class="pb-peerlist">
-                    <template x-for="peer in peerRowsShown" :key="peer.public_key">
-                        <li class="pb-peerlist__item">
-                            <span class="pb-peerlist__avatar">
-                                <img :src="avatarFor(peer)" alt="" width="32" height="32"
-                                    :class="peer.online ? '' : 'pb-avatar--offline'">
-                                <span class="pb-status-dot" :class="peer.online ? 'pb-status-dot--on' : 'pb-status-dot--off'"></span>
-                            </span>
-                            <span class="pb-peerlist__text">
-                                <span class="pb-peerlist__name" x-text="peer.name"></span>
-                                <span class="pb-peerlist__sub"
-                                    x-text="peer.online ? 'Connected' : (peer.last_handshake ? 'Seen ' + formatTime(peer.last_handshake) : 'Never connected')"></span>
+                <p class="{{ ui.foot }}" x-text="trafficSince"></p>
+            </section>
+
+            <!-- Connection health -->
+            <section x-show="stats" class="{{ ui.panel }} {{ third_wide }}" aria-labelledby="health-title">
+                {% set health_badge %}<span class="ml-auto whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold leading-normal"
+                    :class="healthBadgeClass" x-text="healthLabel"></span>{% endset %}
+                {{ panel_head("health-title", "Connection health", "monitor_heart", "violet", health_badge) }}
+                <ul class="m-0 flex list-none flex-col gap-3 p-0 {{ checks_columns }}">
+                    <template x-for="item in healthChecks" :key="item.id">
+                        <li class="flex items-start gap-2.5">
+                            <span class="material-symbols-rounded flex-none text-[1.25rem]" :class="healthIconClass(item.status)"
+                                x-text="item.status === 'ok' ? 'check_circle' : (item.status === 'warn' ? 'warning' : 'error')"></span>
+                            <span class="flex min-w-0 flex-col">
+                                <span class="text-sm font-semibold leading-normal" x-text="item.label"></span>
+                                <span class="text-xs leading-normal text-db-muted [overflow-wrap:anywhere]" x-text="item.detail"></span>
                             </span>
                         </li>
                     </template>
-                    <li x-show="peersHidden > 0" class="pb-peerlist__more">
-                        <a href="/clients" @click.prevent="currentTab = 'clients'" x-text="'+' + peersHidden + ' more'"></a>
-                    </li>
-                    <li x-show="peerRows.length === 0" class="pb-muted">No peers yet. Add a client to get started.</li>
+                    <li x-show="healthChecks.length === 0" class="{{ ui.muted }}">Checking…</li>
                 </ul>
-            </div>
-        </section>
+            </section>
 
-        <!-- Total traffic -->
-        <section x-show="stats" class="pb-panel pb-span-4" aria-labelledby="pb-traffic-title">
-            <header class="pb-panel__head">
-                <span class="pb-panel__icon pb-tint-sky"><span class="material-symbols-rounded">swap_vert</span></span>
-                <h3 id="pb-traffic-title" class="pb-panel__title">Total traffic</h3>
-            </header>
-            <div class="pb-panel__body">
-            <div class="pb-stat-pair">
-                <div class="pb-stat">
-                    <span class="pb-stat__label"><span class="material-symbols-rounded pb-c-down">arrow_downward</span>Download</span>
-                    <strong class="pb-stat__value" x-text="formatBytes(stats?.traffic?.download_total)"></strong>
-                    <span class="pb-stat__sub" x-text="'Last 24 h: ' + formatBytes(stats?.traffic?.last_24h?.download)"></span>
-                </div>
-                <div class="pb-stat">
-                    <span class="pb-stat__label"><span class="material-symbols-rounded pb-c-up">arrow_upward</span>Upload</span>
-                    <strong class="pb-stat__value" x-text="formatBytes(stats?.traffic?.upload_total)"></strong>
-                    <span class="pb-stat__sub" x-text="'Last 24 h: ' + formatBytes(stats?.traffic?.last_24h?.upload)"></span>
-                </div>
-            </div>
-            <div class="pb-split-bar" role="img"
-                :aria-label="'Download ' + downloadShare + ' percent, upload ' + uploadShare + ' percent'">
-                <span class="pb-split-bar__down" :style="{ width: downloadShare + '%' }"></span>
-                <span class="pb-split-bar__up" :style="{ width: uploadShare + '%' }"></span>
-            </div>
-            <div class="pb-split-bar__legend">
-                <span><i class="pb-swatch pb-swatch--down"></i>Download <b x-text="downloadShare + '%'"></b></span>
-                <span><i class="pb-swatch pb-swatch--up"></i>Upload <b x-text="uploadShare + '%'"></b></span>
-            </div>
-            </div>
-            <p class="pb-foot" x-text="trafficSince"></p>
-        </section>
-
-        <!-- Connection health -->
-        <section x-show="stats" class="pb-panel pb-span-4 pb-wide-mid" aria-labelledby="pb-health-title">
-            <header class="pb-panel__head">
-                <span class="pb-panel__icon pb-tint-violet"><span class="material-symbols-rounded">monitor_heart</span></span>
-                <h3 id="pb-health-title" class="pb-panel__title">Connection health</h3>
-                <span class="pb-badge" :class="'pb-badge--' + healthStatus" x-text="healthLabel"></span>
-            </header>
-            <ul class="pb-checks">
-                <template x-for="item in healthChecks" :key="item.id">
-                    <li class="pb-check">
-                        <span class="material-symbols-rounded pb-check__icon" :class="'pb-check__icon--' + item.status"
-                            x-text="item.status === 'ok' ? 'check_circle' : (item.status === 'warn' ? 'warning' : 'error')"></span>
-                        <span class="pb-check__text">
-                            <span class="pb-check__label" x-text="item.label"></span>
-                            <span class="pb-check__detail" x-text="item.detail"></span>
-                        </span>
-                    </li>
-                </template>
-                <li x-show="healthChecks.length === 0" class="pb-muted">Checking…</li>
-            </ul>
-        </section>
-
-        <!-- Traffic over time -->
-        <section class="pb-panel pb-span-8" aria-labelledby="pb-chart-title">
-            <header class="pb-panel__head">
-                <span class="pb-panel__icon pb-tint-sky"><span class="material-symbols-rounded">show_chart</span></span>
-                <h3 id="pb-chart-title" class="pb-panel__title">Traffic over time</h3>
-                <div class="pb-segmented" role="group" aria-label="Time range">
+            <!-- Traffic over time -->
+            <section class="{{ ui.panel }} col-span-12 @[1000px]:col-span-8" aria-labelledby="chart-title">
+                {% set range_switch %}<div class="ml-auto inline-flex rounded-full border border-db-line p-0.5" role="group" aria-label="Time range">
                     <template x-for="option in historyRanges" :key="option.id">
                         <button type="button" @click="setHistoryRange(option.id)"
                             :aria-pressed="historyRange === option.id ? 'true' : 'false'"
-                            :class="historyRange === option.id ? 'is-active' : ''" x-text="option.label"></button>
+                            class="rounded-full border-0 px-3 py-1 text-xs font-semibold leading-normal transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-db-accent motion-reduce:transition-none"
+                            :class="historyRange === option.id ? 'bg-db-accent text-white' : 'bg-transparent text-db-muted hover:bg-db-surface hover:text-db-fg'"
+                            x-text="option.label"></button>
                     </template>
+                </div>{% endset %}
+                {{ panel_head("chart-title", "Traffic over time", "show_chart", "sky", range_switch) }}
+                <div class="-mt-2 mb-3 flex flex-wrap items-center gap-4 text-xs leading-normal text-db-muted">
+                    <span><i class="{{ ui.swatch }} bg-db-down"></i>Download</span>
+                    <span><i class="{{ ui.swatch }} bg-db-up"></i>Upload</span>
+                    <span class="{{ ui.muted }} ml-auto" x-text="chartSummary"></span>
                 </div>
-            </header>
-            <div class="pb-chart-legend">
-                <span><i class="pb-swatch pb-swatch--down"></i>Download</span>
-                <span><i class="pb-swatch pb-swatch--up"></i>Upload</span>
-                <span class="pb-muted" x-text="chartSummary"></span>
-            </div>
-            <div class="pb-chart">
-                <canvas x-show="history" x-ref="trafficCanvas" role="img"
-                    aria-label="Download and upload traffic over the selected period"></canvas>
-                <p class="pb-chart__empty pb-muted" role="status" x-show="!history && !historyError">Loading traffic history…</p>
-                <p class="pb-chart__empty pb-muted" x-show="history && chartIsEmpty && !historyError">No traffic recorded in this period yet.</p>
-            </div>
-            <p x-show="historyError" role="alert" class="pb-hint" x-text="historyError"></p>
-        </section>
+                <div class="relative h-64">
+                    <canvas class="block" x-show="history" x-ref="trafficCanvas" role="img"
+                        aria-label="Download and upload traffic over the selected period"></canvas>
+                    <p class="{{ chart_empty }}" role="status" x-show="!history && !historyError">Loading traffic history…</p>
+                    <p class="{{ chart_empty }}" x-show="history && chartIsEmpty && !historyError">No traffic recorded in this period yet.</p>
+                </div>
+                <p x-show="historyError" role="alert" class="{{ ui.hint }}" x-text="historyError"></p>
+            </section>
 
-        <!-- Top talkers -->
-        <section class="pb-panel pb-span-4 pb-wide-mid" aria-labelledby="pb-talkers-title">
-            <header class="pb-panel__head">
-                <span class="pb-panel__icon pb-tint-amber"><span class="material-symbols-rounded">leaderboard</span></span>
-                <h3 id="pb-talkers-title" class="pb-panel__title">Top talkers</h3>
-                <span class="pb-panel__hint" x-text="historyRangeLabel"></span>
-            </header>
-            <ol class="pb-talkers">
-                <template x-for="talker in talkers" :key="talker.public_key">
-                    <li class="pb-talker">
-                        <img :src="avatarFor(talker)" alt="" width="32" height="32" class="pb-talker__avatar">
-                        <div class="pb-talker__body">
-                            <div class="pb-talker__row">
-                                <span class="pb-talker__name" x-text="talker.name"></span>
-                                <span class="pb-talker__total" x-text="formatBytes(talker.total)"></span>
+            <!-- Top talkers -->
+            <section class="{{ ui.panel }} {{ third_wide }}" aria-labelledby="talkers-title">
+                {% set talkers_range %}<span class="{{ ui.panel_hint }}" x-text="historyRangeLabel"></span>{% endset %}
+                {{ panel_head("talkers-title", "Top talkers", "leaderboard", "amber", talkers_range) }}
+                <ol class="m-0 flex list-none flex-col gap-4 p-0 {{ talkers_columns }}">
+                    <template x-for="talker in talkers" :key="talker.public_key">
+                        <li class="flex items-start gap-3">
+                            <img :src="avatarFor(talker)" alt="" width="32" height="32" class="h-8 w-8 flex-none rounded-full">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-baseline justify-between gap-2">
+                                    <span class="truncate text-sm font-semibold leading-normal" x-text="talker.name"></span>
+                                    <span class="flex-none font-mono text-[0.8125rem] font-semibold" x-text="formatBytes(talker.total)"></span>
+                                </div>
+                                <div class="{{ ui.meter }}" role="img" :aria-label="talker.name + ' used ' + formatBytes(talker.total)">
+                                    <span class="{{ ui.meter_bar }} bg-gradient-to-r from-db-down to-db-up" :style="{ width: talker.share + '%' }"></span>
+                                </div>
+                                <div class="mt-1 flex gap-4 text-xs leading-normal text-db-muted">
+                                    <span class="inline-flex items-center gap-0.5"><span class="material-symbols-rounded text-[1.125rem] text-db-down">arrow_downward</span><span x-text="formatBytes(talker.download)"></span></span>
+                                    <span class="inline-flex items-center gap-0.5"><span class="material-symbols-rounded text-[1.125rem] text-db-up">arrow_upward</span><span x-text="formatBytes(talker.upload)"></span></span>
+                                </div>
                             </div>
-                            <div class="pb-meter" role="img"
-                                :aria-label="talker.name + ' used ' + formatBytes(talker.total)">
-                                <span class="pb-meter__bar" :style="{ width: talker.share + '%' }"></span>
-                            </div>
-                            <div class="pb-talker__split">
-                                <span><span class="material-symbols-rounded pb-c-down">arrow_downward</span><span x-text="formatBytes(talker.download)"></span></span>
-                                <span><span class="material-symbols-rounded pb-c-up">arrow_upward</span><span x-text="formatBytes(talker.upload)"></span></span>
-                            </div>
-                        </div>
-                    </li>
-                </template>
-                <li x-show="history && talkers.length === 0" class="pb-muted">No traffic recorded in this period yet.</li>
-            </ol>
-        </section>
+                        </li>
+                    </template>
+                    <li x-show="history && talkers.length === 0" class="{{ ui.muted }}">No traffic recorded in this period yet.</li>
+                </ol>
+            </section>
 
-        <!-- Server -->
-        <section x-show="stats" class="pb-panel pb-span-12" aria-labelledby="pb-server-title">
-            <header class="pb-panel__head">
-                <span class="pb-panel__icon pb-tint-rose"><span class="material-symbols-rounded">dns</span></span>
-                <h3 id="pb-server-title" class="pb-panel__title">Server</h3>
-                <span class="pb-panel__hint" x-text="serverFooter"></span>
-            </header>
-            <div class="pb-server">
-                <template x-for="gauge in gauges" :key="gauge.key">
-                    <div class="pb-gauge">
-                        <div class="pb-ring pb-ring--sm" :class="gauge.tone" role="img"
-                            :aria-label="gauge.label + ' ' + gauge.pct + ' percent'">
-                            <svg viewBox="0 0 120 120" aria-hidden="true">
-                                <circle class="pb-ring__track" cx="60" cy="60" r="50" />
-                                <circle class="pb-ring__value" cx="60" cy="60" r="50" :stroke-dasharray="ringDash(gauge.pct)" />
-                            </svg>
-                            <div class="pb-ring__label"><strong x-text="gauge.pct + '%'"></strong></div>
+            <!-- Server -->
+            <section x-show="stats" class="{{ ui.panel }} col-span-12" aria-labelledby="server-title">
+                {% set server_footer %}<span class="{{ ui.panel_hint }}" x-text="serverFooter"></span>{% endset %}
+                {{ panel_head("server-title", "Server", "dns", "rose", server_footer) }}
+                <div class="grid grid-cols-[repeat(auto-fit,minmax(13rem,1fr))] items-center gap-x-8 gap-y-6">
+                    <template x-for="gauge in gauges" :key="gauge.key">
+                        <div class="flex items-center gap-4">
+                            <div class="relative h-[5.5rem] w-[5.5rem] flex-none" :class="gauge.tone" role="img"
+                                :aria-label="gauge.label + ' ' + gauge.pct + ' percent'">
+                                <svg viewBox="0 0 120 120" class="h-full w-full -rotate-90" aria-hidden="true">
+                                    <circle class="{{ ui.ring_track }}" cx="60" cy="60" r="50" />
+                                    <circle class="{{ ui.ring_value }}" :class="ringDash(gauge.pct).startsWith('0 ') ? 'invisible' : ''"
+                                        cx="60" cy="60" r="50" :stroke-dasharray="ringDash(gauge.pct)" />
+                                </svg>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center leading-[1.1]">
+                                    <strong class="text-[1.125rem] font-bold text-db-fg" x-text="gauge.pct + '%'"></strong>
+                                </div>
+                            </div>
+                            <div class="flex min-w-0 flex-col gap-1">
+                                <span class="{{ gauge_name }}"><span class="material-symbols-rounded text-[1.125rem] text-db-muted" x-text="gauge.icon"></span><span x-text="gauge.label"></span></span>
+                                <span class="text-xs leading-normal text-db-muted" x-text="gauge.sub"></span>
+                            </div>
                         </div>
-                        <div class="pb-gauge__meta">
-                            <span class="pb-gauge__name"><span class="material-symbols-rounded" x-text="gauge.icon"></span><span x-text="gauge.label"></span></span>
-                            <span class="pb-gauge__sub" x-text="gauge.sub"></span>
-                        </div>
+                    </template>
+                    <div class="flex flex-col gap-1">
+                        <span class="{{ gauge_name }}"><span class="material-symbols-rounded text-[1.125rem] text-db-muted">speed</span>Load average</span>
+                        <template x-for="row in loadRows" :key="row.label">
+                            <div class="grid grid-cols-[3.25rem_1fr_2.5rem] items-center gap-2.5 text-xs leading-normal">
+                                <span class="text-db-muted" x-text="row.label"></span>
+                                <div class="{{ ui.meter }} !mt-0" :class="row.tone" role="img"
+                                    :aria-label="row.label + ' load ' + row.value">
+                                    <span class="{{ ui.meter_bar }} bg-current" :style="{ width: row.pct + '%' }"></span>
+                                </div>
+                                <span class="text-right font-mono font-semibold" x-text="row.value"></span>
+                            </div>
+                        </template>
+                        <p class="{{ ui.foot }}" x-text="loadNote"></p>
                     </div>
-                </template>
-                <div class="pb-load">
-                    <span class="pb-gauge__name"><span class="material-symbols-rounded">speed</span>Load average</span>
-                    <template x-for="row in loadRows" :key="row.label">
-                        <div class="pb-load__row">
-                            <span class="pb-load__label" x-text="row.label"></span>
-                            <div class="pb-meter" :class="row.tone" role="img"
-                                :aria-label="row.label + ' load ' + row.value">
-                                <span class="pb-meter__bar" :style="{ width: row.pct + '%' }"></span>
-                            </div>
-                            <span class="pb-load__value" x-text="row.value"></span>
-                        </div>
-                    </template>
-                    <p class="pb-foot" x-text="loadNote"></p>
                 </div>
-            </div>
-        </section>
-    </div>
+            </section>
+        </div>
     </div>
 
     <!-- Quick Actions -->
@@ -270,8 +272,8 @@
         <button @click="openClientModal()"
             class="group p-6 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl shadow-lg shadow-primary-500/20 text-white text-left hover:shadow-xl hover:shadow-primary-500/30 transition-all duration-300 transform hover:-translate-y-1">
             <div class="flex items-center justify-between mb-4">
-                <span class="pb-action-icon bg-white/20 backdrop-blur-sm">
-                    <span class="material-symbols-rounded text-2xl">person_add</span>
+                <span class="inline-flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
+                    <span class="material-symbols-rounded text-2xl leading-none">person_add</span>
                 </span>
                 <span
                     class="material-symbols-rounded text-2xl opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1">arrow_forward</span>
@@ -283,8 +285,8 @@
         <button @click="openFwdModal()"
             class="group p-6 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl shadow-sm text-left hover:border-primary-500 dark:hover:border-primary-500 transition-all duration-300 transform hover:-translate-y-1">
             <div class="flex items-center justify-between mb-4">
-                <span class="pb-action-icon bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400">
-                    <span class="material-symbols-rounded text-2xl">add_link</span>
+                <span class="inline-flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
+                    <span class="material-symbols-rounded text-2xl leading-none">add_link</span>
                 </span>
                 <span
                     class="material-symbols-rounded text-2xl text-slate-400 group-hover:text-primary-500 transition-colors">arrow_forward</span>

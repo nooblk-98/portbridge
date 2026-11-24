@@ -1,3 +1,107 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Everything the utilities cannot express lives here: the theme variables behind
+ * the semantic colours in tailwind.config.js, the colour scheme, scrollbars and
+ * Alpine's x-cloak. Components are styled with utility classes in the templates.
+ */
+@layer base {
+  :root {
+    /* App-wide controls and cards. */
+    --ui-surface: #ffffff;
+    --ui-surface-muted: #f8fafc;
+    --ui-line: #e2e8f0;
+    --ui-fg: #0f172a;
+    --ui-muted: #475569;
+    --ui-focus: #0369a1;
+    --ui-accent: #0369a1;
+    --ui-accent-hover: #075985;
+    --ui-danger: #b91c1c;
+
+    /* Dashboard panels. */
+    --db-panel: #ffffff;
+    --db-panel-line: #f3f4f6;
+    --db-line: #e2e8f0;
+    --db-fg: #0f172a;
+    --db-muted: #64748b;
+    --db-track: #e2e8f0;
+    --db-surface: #f8fafc;
+    --db-accent: #0369a1;
+
+    /* Colour scheme: follow the system unless theme.js pins one through the
+       <meta name="color-scheme"> element. Native UI (scrollbars, form controls)
+       keys off this property. */
+    color-scheme: light dark;
+
+    /* Scrollbar thumbs keep at least 3:1 contrast with the page. */
+    --scrollbar-thumb: #7c8ba1;
+    --scrollbar-thumb-hover: #64748b;
+    --scrollbar-track: transparent;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    scrollbar-width: thin;
+  }
+
+  :root:has(> head > meta[name="color-scheme"][content="dark"]) {
+    color-scheme: dark;
+  }
+
+  :root:has(> head > meta[name="color-scheme"][content="light"]) {
+    color-scheme: light;
+  }
+
+  .dark {
+    --ui-surface: #1e293b;
+    --ui-surface-muted: #172033;
+    --ui-line: #334155;
+    --ui-fg: #f1f5f9;
+    --ui-muted: #a7b6c9;
+    --ui-focus: #7dd3fc;
+    --ui-accent: #38bdf8;
+    --ui-accent-hover: #7dd3fc;
+    --ui-danger: #fca5a5;
+
+    --db-panel: rgb(30 41 59);
+    --db-panel-line: rgb(51 65 85);
+    --db-line: #334155;
+    --db-fg: #f1f5f9;
+    --db-muted: #94a3b8;
+    --db-track: #334155;
+    --db-surface: rgb(15 23 42 / 0.55);
+    --db-accent: #0ea5e9;
+
+    --scrollbar-thumb: #64748b;
+    --scrollbar-thumb-hover: #94a3b8;
+  }
+
+  /* Browsers without the standard properties fall back to WebKit pseudo-elements. */
+  @supports not (scrollbar-color: auto) {
+    :root {
+      scrollbar-width: auto;
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-thumb-hover);
+    }
+  }
+
+  /* Hidden until Alpine has started. */
+  [x-cloak] {
+    display: none !important;
+  }
+}

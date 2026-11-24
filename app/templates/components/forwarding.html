@@ -1,3 +1,4 @@
+{% from "components/ui.html" import ui %}
 <!-- Forwarding View -->
 <div x-show="currentTab === 'forwarding'" x-cloak x-transition:enter="transition ease-out duration-300"
     x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
@@ -14,8 +15,8 @@
         </button>
     </header>
 
-    <p x-show="!forwardingsReady && !forwardingError" role="status" class="pb-hint">Loading forwarding rules…</p>
-    <p x-show="forwardingError" role="alert" class="pb-hint" x-text="forwardingError"></p>
+    <p x-show="!forwardingsReady && !forwardingError" role="status" class="{{ ui.hint }}">Loading forwarding rules…</p>
+    <p x-show="forwardingError" role="alert" class="{{ ui.hint }}" x-text="forwardingError"></p>
 
     <div x-show="forwardingsReady && !forwardingError"
         class="bg-white dark:bg-dark-surface rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
