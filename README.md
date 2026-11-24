@@ -1,9 +1,5 @@
 <div align="center">
-  <img src="images/logo/logo.svg" alt="PortBridge logo" width="120">
-
-  # PortBridge
-
-  **Reach devices behind NAT or CGNAT through a WireGuard server you control.**
+  <img src="images/banner.png" alt="PortBridge: reach devices behind NAT or CGNAT through a WireGuard server you control" width="100%">
 
   [![Release](https://img.shields.io/github/v/release/nooblk-98/portbridge)](https://github.com/nooblk-98/portbridge/releases)
   [![Docker image](https://img.shields.io/docker/pulls/lahiru98s/portbridge)](https://hub.docker.com/r/lahiru98s/portbridge)
@@ -16,6 +12,23 @@ PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptabl
 - **Public forwarding**: publish a TCP or UDP port on the server and send it to a service on a peer, with optional source IP restrictions.
 - **Easy onboarding**: create peers in the UI, then download the config or scan a QR code.
 - **Safe defaults**: passwords are stored as salted hashes, logins are rate limited, and peers can only reach each other through routes you approve.
+
+## Screenshots
+
+<p align="center">
+  <img src="images/screenshots/dashboard.png" alt="PortBridge dashboard" width="100%">
+</p>
+
+<table>
+  <tr>
+    <td width="50%"><img src="images/screenshots/clients.png" alt="Clients: connected peers with handshake and data usage"><br><sub><b>Clients</b>: peers, handshakes and data usage</sub></td>
+    <td width="50%"><img src="images/screenshots/routes.png" alt="Routes: who may use each advertised route"><br><sub><b>Routes</b>: advertised routes and who can reach them</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="images/screenshots/forwarding.png" alt="Forwarding: public port rules"><br><sub><b>Forwarding</b>: publish a service on a public port</sub></td>
+    <td width="50%"><img src="images/screenshots/dashboard-dark.png" alt="Dashboard in dark mode"><br><sub><b>Dark mode</b>: follows your system or your choice</sub></td>
+  </tr>
+</table>
 
 ## Quick start
 
