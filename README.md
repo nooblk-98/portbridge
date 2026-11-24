@@ -13,6 +13,7 @@ PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptabl
 
 - **Private access**: share a host or subnet with other peers over WireGuard, with per-route access control.
 - **Public forwarding**: publish a TCP or UDP port on the server and send it to a service on a peer, with optional source IP restrictions.
+- **Live dashboard**: peers online, traffic over time, top talkers, connection health checks, and CPU, memory and disk gauges.
 - **Easy onboarding**: create peers in the UI, then download the config or scan a QR code. Each peer gets its own cartoon avatar.
 - **Split tunnel by default**: devices keep their own internet connection and IP. Switch a peer to full tunnel from its card when you want its traffic to leave through the server.
 - **Safe defaults**: passwords are stored as salted hashes, logins are rate limited, and peers can only reach each other through routes you approve.

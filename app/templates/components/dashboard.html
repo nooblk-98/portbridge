@@ -65,6 +65,199 @@
         </div>
     </div>
 
+    <!-- Live status -->
+    <div class="pb-dash mb-8">
+    <div class="pb-dash-grid">
+
+        <!-- Peers online -->
+        <section class="pb-panel pb-span-4" aria-labelledby="pb-peers-title">
+            <header class="pb-panel__head">
+                <span class="pb-panel__icon pb-tint-emerald"><span class="material-symbols-rounded">groups</span></span>
+                <h3 id="pb-peers-title" class="pb-panel__title">Peers online</h3>
+            </header>
+            <div class="pb-split">
+                <div class="pb-ring" :class="peersTone" role="img"
+                    :aria-label="peersOnline + ' of ' + peersTotal + ' peers online'">
+                    <svg viewBox="0 0 120 120" aria-hidden="true">
+                        <circle class="pb-ring__track" cx="60" cy="60" r="50" />
+                        <circle class="pb-ring__value" cx="60" cy="60" r="50" :stroke-dasharray="ringDash(peersOnlinePct)" />
+                    </svg>
+                    <div class="pb-ring__label">
+                        <strong x-text="peersOnline"></strong>
+                        <span x-text="'of ' + peersTotal"></span>
+                    </div>
+                </div>
+                <ul class="pb-peerlist">
+                    <template x-for="peer in peerRows" :key="peer.public_key">
+                        <li class="pb-peerlist__item">
+                            <span class="pb-peerlist__avatar">
+                                <img :src="avatarFor(peer)" alt="" width="32" height="32"
+                                    :class="peer.online ? '' : 'pb-avatar--offline'">
+                                <span class="pb-dot" :class="peer.online ? 'pb-dot--on' : 'pb-dot--off'"></span>
+                            </span>
+                            <span class="pb-peerlist__text">
+                                <span class="pb-peerlist__name" x-text="peer.name"></span>
+                                <span class="pb-peerlist__sub"
+                                    x-text="peer.online ? 'Connected' : (peer.last_handshake ? 'Seen ' + formatTime(peer.last_handshake) : 'Never connected')"></span>
+                            </span>
+                        </li>
+                    </template>
+                    <li x-show="peerRows.length === 0" class="pb-muted">No peers yet. Add a client to get started.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Total traffic -->
+        <section class="pb-panel pb-span-4" aria-labelledby="pb-traffic-title">
+            <header class="pb-panel__head">
+                <span class="pb-panel__icon pb-tint-sky"><span class="material-symbols-rounded">swap_vert</span></span>
+                <h3 id="pb-traffic-title" class="pb-panel__title">Total traffic</h3>
+            </header>
+            <div class="pb-stat-pair">
+                <div class="pb-stat">
+                    <span class="pb-stat__label"><span class="material-symbols-rounded pb-c-down">arrow_downward</span>Download</span>
+                    <strong class="pb-stat__value" x-text="formatBytes(stats?.traffic?.download_total)"></strong>
+                    <span class="pb-stat__sub" x-text="'Last 24 h: ' + formatBytes(stats?.traffic?.last_24h?.download)"></span>
+                </div>
+                <div class="pb-stat">
+                    <span class="pb-stat__label"><span class="material-symbols-rounded pb-c-up">arrow_upward</span>Upload</span>
+                    <strong class="pb-stat__value" x-text="formatBytes(stats?.traffic?.upload_total)"></strong>
+                    <span class="pb-stat__sub" x-text="'Last 24 h: ' + formatBytes(stats?.traffic?.last_24h?.upload)"></span>
+                </div>
+            </div>
+            <div class="pb-split-bar" role="img"
+                :aria-label="'Download ' + downloadShare + ' percent, upload ' + uploadShare + ' percent'">
+                <span class="pb-split-bar__down" :style="{ width: downloadShare + '%' }"></span>
+                <span class="pb-split-bar__up" :style="{ width: uploadShare + '%' }"></span>
+            </div>
+            <div class="pb-split-bar__legend">
+                <span><i class="pb-swatch pb-swatch--down"></i>Download <b x-text="downloadShare + '%'"></b></span>
+                <span><i class="pb-swatch pb-swatch--up"></i>Upload <b x-text="uploadShare + '%'"></b></span>
+            </div>
+            <p class="pb-foot" x-text="trafficSince"></p>
+        </section>
+
+        <!-- Connection health -->
+        <section class="pb-panel pb-span-4 pb-wide-mid" aria-labelledby="pb-health-title">
+            <header class="pb-panel__head">
+                <span class="pb-panel__icon pb-tint-violet"><span class="material-symbols-rounded">monitor_heart</span></span>
+                <h3 id="pb-health-title" class="pb-panel__title">Connection health</h3>
+                <span class="pb-badge" :class="'pb-badge--' + healthStatus" x-text="healthLabel"></span>
+            </header>
+            <ul class="pb-checks">
+                <template x-for="item in healthChecks" :key="item.id">
+                    <li class="pb-check">
+                        <span class="material-symbols-rounded pb-check__icon" :class="'pb-check__icon--' + item.status"
+                            x-text="item.status === 'ok' ? 'check_circle' : (item.status === 'warn' ? 'warning' : 'error')"></span>
+                        <span class="pb-check__text">
+                            <span class="pb-check__label" x-text="item.label"></span>
+                            <span class="pb-check__detail" x-text="item.detail"></span>
+                        </span>
+                    </li>
+                </template>
+                <li x-show="healthChecks.length === 0" class="pb-muted">Checking…</li>
+            </ul>
+        </section>
+
+        <!-- Traffic over time -->
+        <section class="pb-panel pb-span-8" aria-labelledby="pb-chart-title">
+            <header class="pb-panel__head">
+                <span class="pb-panel__icon pb-tint-sky"><span class="material-symbols-rounded">show_chart</span></span>
+                <h3 id="pb-chart-title" class="pb-panel__title">Traffic over time</h3>
+                <div class="pb-segmented" role="group" aria-label="Time range">
+                    <template x-for="option in historyRanges" :key="option.id">
+                        <button type="button" @click="setHistoryRange(option.id)"
+                            :aria-pressed="historyRange === option.id ? 'true' : 'false'"
+                            :class="historyRange === option.id ? 'is-active' : ''" x-text="option.label"></button>
+                    </template>
+                </div>
+            </header>
+            <div class="pb-chart-legend">
+                <span><i class="pb-swatch pb-swatch--down"></i>Download</span>
+                <span><i class="pb-swatch pb-swatch--up"></i>Upload</span>
+                <span class="pb-muted" x-text="chartSummary"></span>
+            </div>
+            <div class="pb-chart">
+                <canvas x-ref="trafficCanvas" role="img"
+                    aria-label="Download and upload traffic over the selected period"></canvas>
+                <p class="pb-chart__empty pb-muted" x-show="history && chartIsEmpty">No traffic recorded in this period yet.</p>
+            </div>
+        </section>
+
+        <!-- Top talkers -->
+        <section class="pb-panel pb-span-4 pb-wide-mid" aria-labelledby="pb-talkers-title">
+            <header class="pb-panel__head">
+                <span class="pb-panel__icon pb-tint-amber"><span class="material-symbols-rounded">leaderboard</span></span>
+                <h3 id="pb-talkers-title" class="pb-panel__title">Top talkers</h3>
+                <span class="pb-panel__hint" x-text="historyRangeLabel"></span>
+            </header>
+            <ol class="pb-talkers">
+                <template x-for="talker in talkers" :key="talker.public_key">
+                    <li class="pb-talker">
+                        <img :src="avatarFor(talker)" alt="" width="32" height="32" class="pb-talker__avatar">
+                        <div class="pb-talker__body">
+                            <div class="pb-talker__row">
+                                <span class="pb-talker__name" x-text="talker.name"></span>
+                                <span class="pb-talker__total" x-text="formatBytes(talker.total)"></span>
+                            </div>
+                            <div class="pb-meter" role="img"
+                                :aria-label="talker.name + ' used ' + formatBytes(talker.total)">
+                                <span class="pb-meter__bar" :style="{ width: talker.share + '%' }"></span>
+                            </div>
+                            <div class="pb-talker__split">
+                                <span><span class="material-symbols-rounded pb-c-down">arrow_downward</span><span x-text="formatBytes(talker.download)"></span></span>
+                                <span><span class="material-symbols-rounded pb-c-up">arrow_upward</span><span x-text="formatBytes(talker.upload)"></span></span>
+                            </div>
+                        </div>
+                    </li>
+                </template>
+                <li x-show="talkers.length === 0" class="pb-muted">No traffic recorded in this period yet.</li>
+            </ol>
+        </section>
+
+        <!-- Server -->
+        <section class="pb-panel pb-span-12" aria-labelledby="pb-server-title">
+            <header class="pb-panel__head">
+                <span class="pb-panel__icon pb-tint-rose"><span class="material-symbols-rounded">dns</span></span>
+                <h3 id="pb-server-title" class="pb-panel__title">Server</h3>
+                <span class="pb-panel__hint" x-text="serverFooter"></span>
+            </header>
+            <div class="pb-server">
+                <template x-for="gauge in gauges" :key="gauge.key">
+                    <div class="pb-gauge">
+                        <div class="pb-ring pb-ring--sm" :class="gauge.tone" role="img"
+                            :aria-label="gauge.label + ' ' + gauge.pct + ' percent'">
+                            <svg viewBox="0 0 120 120" aria-hidden="true">
+                                <circle class="pb-ring__track" cx="60" cy="60" r="50" />
+                                <circle class="pb-ring__value" cx="60" cy="60" r="50" :stroke-dasharray="ringDash(gauge.pct)" />
+                            </svg>
+                            <div class="pb-ring__label"><strong x-text="gauge.pct + '%'"></strong></div>
+                        </div>
+                        <div class="pb-gauge__meta">
+                            <span class="pb-gauge__name"><span class="material-symbols-rounded" x-text="gauge.icon"></span><span x-text="gauge.label"></span></span>
+                            <span class="pb-gauge__sub" x-text="gauge.sub"></span>
+                        </div>
+                    </div>
+                </template>
+                <div class="pb-load">
+                    <span class="pb-gauge__name"><span class="material-symbols-rounded">speed</span>Load average</span>
+                    <template x-for="row in loadRows" :key="row.label">
+                        <div class="pb-load__row">
+                            <span class="pb-load__label" x-text="row.label"></span>
+                            <div class="pb-meter" :class="row.tone" role="img"
+                                :aria-label="row.label + ' load ' + row.value">
+                                <span class="pb-meter__bar" :style="{ width: row.pct + '%' }"></span>
+                            </div>
+                            <span class="pb-load__value" x-text="row.value"></span>
+                        </div>
+                    </template>
+                    <p class="pb-foot" x-text="loadNote"></p>
+                </div>
+            </div>
+        </section>
+    </div>
+    </div>
+
     <!-- Quick Actions -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <button @click="openClientModal()"

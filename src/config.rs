@@ -26,6 +26,7 @@ pub struct Config {
     pub wg_address_text: String,
     pub wg_prefix_len: u8,
     pub admin_password: String,
+    pub metrics_file: PathBuf,
     pub default_client_name: String,
     pub default_forward_target: String,
     pub nat_chain: String,
@@ -186,8 +187,10 @@ impl Config {
             PathBuf::from(env::var("STATIC_DIR").unwrap_or_else(|_| "app/static".to_string()));
         let secret_key = load_or_create_secret_key(&data_dir)?;
         let sessions_file = data_dir.join("sessions.json");
+        let metrics_file = data_dir.join("metrics.json");
 
         Ok(Config {
+            metrics_file,
             data_dir,
             clients_dir,
             clients_file,
@@ -236,6 +239,7 @@ impl Config {
         let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let sessions_file = data_dir.join("sessions.json");
         Self {
+            metrics_file: data_dir.join("metrics.json"),
             clients_dir: data_dir.join("clients"),
             clients_file: data_dir.join("clients.json"),
             forward_file: data_dir.join("forwardings.json"),

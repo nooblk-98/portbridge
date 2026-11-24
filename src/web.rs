@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::body::Bytes;
-use axum::extract::{ConnectInfo, Path, Request, State};
+use axum::extract::{ConnectInfo, Path, Query, Request, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
@@ -34,6 +34,7 @@ pub struct AppState {
     pub forwarding_manager: Arc<ForwardingManager>,
     pub auth: Arc<Auth>,
     pub runner: Arc<dyn Runner>,
+    pub stats: Arc<crate::stats::StatsService>,
     pub templates: Arc<Environment<'static>>,
 }
 
@@ -75,6 +76,8 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/login", post(auth_login))
         .route("/auth/logout", post(auth_logout))
         .route("/api/state", get(api_state))
+        .route("/api/stats", get(api_stats))
+        .route("/api/stats/history", get(api_stats_history))
         .route("/api/clients", get(api_clients).post(api_create_client))
         .route(
             "/api/clients/{name}",
@@ -321,6 +324,38 @@ async fn api_state(State(state): State<AppState>, headers: HeaderMap) -> Respons
     match result {
         Ok(value) => json_response(StatusCode::OK, value),
         Err(error) => error.into_response(),
+    }
+}
+
+/// Live dashboard numbers: peers, traffic totals, host gauges and health checks.
+async fn api_stats(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if let Some(response) = require_auth(&state, &headers) {
+        return response;
+    }
+    let stats = state.stats.clone();
+    match tokio::task::spawn_blocking(move || stats.snapshot()).await {
+        Ok(value) => json_response(StatusCode::OK, value),
+        Err(_) => AppError::runtime("Could not read statistics.").into_response(),
+    }
+}
+
+/// Traffic over time and the busiest peers for `?range=1h|24h|7d`.
+async fn api_stats_history(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    if let Some(response) = require_auth(&state, &headers) {
+        return response;
+    }
+    let range = query.get("range").map(String::as_str).unwrap_or("1h");
+    let Some(range) = crate::metrics::Range::parse(range) else {
+        return AppError::validation("Range must be 1h, 24h or 7d.").into_response();
+    };
+    let stats = state.stats.clone();
+    match tokio::task::spawn_blocking(move || stats.history(range)).await {
+        Ok(value) => json_response(StatusCode::OK, value),
+        Err(_) => AppError::runtime("Could not read traffic history.").into_response(),
     }
 }
 

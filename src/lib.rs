@@ -4,11 +4,14 @@ pub mod config;
 pub mod error;
 pub mod forwarding_manager;
 pub mod iptables;
+pub mod metrics;
 pub mod model;
 pub mod qr;
 pub mod rule_renderer;
 pub mod runner;
+pub mod stats;
 pub mod storage;
+pub mod system;
 pub mod web;
 pub mod wireguard;
 
@@ -28,7 +31,9 @@ use crate::client_manager::ClientManager;
 use crate::config::Config;
 use crate::forwarding_manager::ForwardingManager;
 use crate::iptables::IPTablesService;
+use crate::metrics::MetricsService;
 use crate::runner::{Runner, SystemRunner};
+use crate::stats::StatsService;
 use crate::storage::{JsonFileStorage, Storage};
 use crate::wireguard::WireGuardService;
 
@@ -41,6 +46,7 @@ pub struct Services {
     pub forwarding_manager: Arc<ForwardingManager>,
     pub client_manager: Arc<ClientManager>,
     pub auth: Arc<Auth>,
+    pub stats: Arc<StatsService>,
 }
 
 pub fn build_services(config: Config) -> Services {
@@ -81,6 +87,15 @@ pub fn build_services_with(
         config.sessions_file.to_string_lossy().into_owned(),
         config.secret_key().to_vec(),
     ));
+    let metrics = Arc::new(MetricsService::new(
+        storage.clone(),
+        config.metrics_file.to_string_lossy().into_owned(),
+    ));
+    let stats = Arc::new(StatsService::new(
+        config.clone(),
+        wireguard.clone(),
+        metrics,
+    ));
     Services {
         config,
         storage,
@@ -90,5 +105,6 @@ pub fn build_services_with(
         forwarding_manager,
         client_manager,
         auth,
+        stats,
     }
 }

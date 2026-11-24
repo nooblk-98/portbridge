@@ -5,6 +5,38 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.2.0] - 2026-11-24
+
+### Added
+
+- **A live dashboard.** The Dashboard page now shows, in the same light and
+  dark theme as the rest of the app:
+  - **Peers online**: a ring with each peer's avatar and connection state.
+  - **Total traffic**: all-time and last-24-hour download and upload, with the
+    split between them.
+  - **Top talkers**: the busiest peers for the selected period.
+  - **Connection health**: checks for the WireGuard interface and port, peers,
+    firewall rules, IP forwarding and internet access, with an overall status.
+  - **Traffic over time**: a chart you can switch between the last hour, the
+    last 24 hours and the last 7 days.
+  - **Server**: CPU, memory and disk gauges, load average and uptime.
+- Two new API endpoints behind the dashboard: `GET /api/stats` and
+  `GET /api/stats/history?range=1h|24h|7d`.
+- Traffic history. The server samples WireGuard's counters once a minute and
+  keeps minute samples for 24 hours and ten-minute buckets for 7 days in
+  `metrics.json` under `DATA_DIR`. Counter resets, such as an interface restart,
+  are handled, and lifetime totals survive restarts.
+
+### Changed
+
+- The dashboard layout follows the width of the page, so it fits a phone, a
+  narrow window or a wide screen, with or without the sidebar.
+
+### Fixed
+
+- The upload and download arrows on peer cards were reversed. Upload now means
+  data a peer sent to the server and download means data sent to the peer.
+
 ## [1.1.0] - 2026-11-24
 
 This release also includes everything from the automatically numbered 1.0.1
@@ -84,5 +116,6 @@ First release of the Rust version of PortBridge: a WireGuard server with a web
 dashboard, per-peer routes with access rules, and public TCP and UDP port
 forwarding.
 
+[1.2.0]: https://github.com/nooblk-98/portbridge/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/nooblk-98/portbridge/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/nooblk-98/portbridge/releases/tag/v1.0.0

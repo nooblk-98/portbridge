@@ -70,8 +70,21 @@ Clients will receive an unusable config. Set WG_HOST to your server's public IP 
         forwarding_manager: services.forwarding_manager.clone(),
         auth: services.auth.clone(),
         runner: services.runner.clone(),
+        stats: services.stats.clone(),
         templates,
     };
+    // Sample traffic counters once a minute for the dashboard history.
+    let sampler = services.stats.clone();
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(
+            portbridge::metrics::SAMPLE_SECONDS as u64,
+        ));
+        loop {
+            ticker.tick().await;
+            let stats = sampler.clone();
+            let _ = tokio::task::spawn_blocking(move || stats.sample()).await;
+        }
+    });
     let app = router(state);
     let address = format!("{}:{}", services.config.app_host, services.config.app_port);
     let listener = match TcpListener::bind(&address).await {
