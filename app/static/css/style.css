@@ -725,32 +725,6 @@
     }
 }
 
-/* Footer with the repository link and running version. */
-.app-footer {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0.75rem 0 0;
-    font-size: 0.75rem;
-    color: #64748b;
-}
-
-.dark .app-footer {
-    color: #94a3b8;
-}
-
-.app-footer a {
-    color: inherit;
-    text-decoration: none;
-}
-
-.app-footer a:hover,
-.app-footer a:focus-visible {
-    text-decoration: underline;
-}
-
 /* Round on/off switch (native <input type="checkbox" switch>, styled for every browser). */
 .pb-switch {
     appearance: none;
@@ -1752,45 +1726,4 @@
 
 .dark .pb-notice__btn--primary:hover {
     background: #f59e0b;
-}
-
-/* Forwarding rules: stack each rule as a card on narrow screens so the
-   target client and delete button are never hidden off-screen. */
-@media (max-width: 767px) {
-    .pb-fwd-table thead {
-        display: none;
-    }
-
-    .pb-fwd-table,
-    .pb-fwd-table tbody {
-        display: block;
-        width: 100%;
-    }
-
-    .pb-fwd-table tr {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.5rem 1rem;
-        padding: 1rem;
-    }
-
-    .pb-fwd-table td {
-        padding: 0 !important;
-    }
-
-    .pb-fwd-table td.pb-fwd-target {
-        flex-basis: 100%;
-        order: 3;
-    }
-
-    .pb-fwd-table td.pb-fwd-actions {
-        margin-left: auto;
-        order: 2;
-    }
-
-    .pb-fwd-table td[colspan] {
-        flex-basis: 100%;
-        padding: 1.5rem 0 !important;
-    }
 }

@@ -10,11 +10,4 @@
             x-text="isDarkMode ? 'light_mode' : 'dark_mode'"></span>
         <span x-text="isDarkMode ? 'Light Mode' : 'Dark Mode'"></span>
     </button>
-    {% if show_app_footer %}
-    <p class="app-footer">
-        <a href="{{ repo_url }}" target="_blank" rel="noopener noreferrer">GitHub</a>
-        <span aria-hidden="true">&middot;</span>
-        <a href="{{ repo_url }}/releases" target="_blank" rel="noopener noreferrer">v{{ app_version }}</a>
-    </p>
-    {% endif %}
 </div>

@@ -55,6 +55,23 @@ jobs:
             test -z "$(command -v pip3)"
           '
 
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Install build tooling
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+      - name: Rebuild the stylesheet
+        working-directory: frontend
+        run: npm run build:css
+      - name: Check the committed stylesheet is current
+        run: git diff --exit-code -- app/static/css/tailwind.css
+
   installer:
     name: Installer and dashboard scripts
     runs-on: ubuntu-latest

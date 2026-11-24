@@ -5,6 +5,25 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.4.2] - 2026-11-24
+
+### Added
+
+- **A single footer.** It sits under the page content on every screen, pinned
+  while the page scrolls, and no longer repeats in the sidebar or menu drawer. It
+  links to the repository and release, and says "Made with ❤️ by nooblk for the
+  community", linked to the author's GitHub profile. The sign-in screen shows it
+  too.
+
+### Changed
+
+- **One front-end toolchain.** The stylesheet is built from a committed Tailwind
+  configuration in `frontend/` (`npm run build:css`), instead of a pre-built file
+  with no source. The new footer and the mobile Forwarding cards use Tailwind
+  classes rather than custom CSS. CI rebuilds the stylesheet and fails if the
+  committed one is out of date. Running PortBridge still needs no Node.
+- Vendored third-party scripts moved to `app/static/vendor/`.
+
 ## [1.4.1] - 2026-11-24
 
 ### Fixed
