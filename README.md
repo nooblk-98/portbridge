@@ -9,7 +9,7 @@
   [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 </div>
 
-PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptables port forwarding, managed from a web dashboard. Run it on a public VPS to expose services from home labs, Starlink or other connections that cannot accept inbound traffic.
+PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptables port forwarding, managed from a web dashboard. Run it on a public VPS to expose services from home labs, Starlink or other connections that cannot accept inbound traffic. Think of it as a **self-hosted alternative to Tailscale and Headscale**, with public port forwarding built in, that also works as a **bastion (jump) host**.
 
 - **Private access**: share a host or subnet with other peers over WireGuard, with per-route access control.
 - **Public forwarding**: publish a TCP or UDP port on the server and send it to a service on a peer, with optional source IP restrictions.
@@ -17,6 +17,40 @@ PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptabl
 - **Easy onboarding**: create peers in the UI, then download the config or scan a QR code. Each peer gets its own cartoon avatar.
 - **Split tunnel by default**: devices keep their own internet connection and IP. Switch a peer to full tunnel from its card when you want its traffic to leave through the server.
 - **Safe defaults**: passwords are stored as salted hashes, logins are rate limited, and peers can only reach each other through routes you approve.
+
+## Where PortBridge fits
+
+PortBridge is a **self-hosted alternative to Tailscale and Headscale** for a common setup: you have a VPS with a public IP, and you want devices behind NAT or CGNAT, such as home labs, Starlink and mobile networks, to reach each other and be reachable, without a third-party account or hosted control plane.
+
+It covers the same ground as, and can replace, tools such as:
+
+- **VPN and mesh tools**: Tailscale, Headscale, NetBird, Netmaker, ZeroTier, Nebula, and WireGuard managers such as wg-easy.
+- **Tunnels that publish a port**: frp, rathole, ngrok, Cloudflare Tunnel and Pangolin.
+
+PortBridge is a **hub and spoke**, not a mesh: every peer connects to your server and traffic between peers passes through it. That keeps it simple, with plain WireGuard configs, one public UDP port and one binary. It also lets PortBridge do something most VPN tools do not: **publish a public TCP or UDP port** on the server and send it into a peer.
+
+| Choose PortBridge when you want | Choose a mesh tool when you need |
+| --- | --- |
+| One server you control, with no external account or hosted coordination service | Direct peer-to-peer connections and NAT traversal between peers |
+| To publish a service from behind CGNAT on a public port | Sign-in with your identity provider and per-user or per-group policies |
+| Plain WireGuard profiles and QR codes that work with any client | Large teams or hundreds of devices |
+
+### Use it as a bastion host
+
+Every peer can reach the server, and any peer can share a subnet, so the VPS also works as a **bastion (jump) host** for machines that have no public address.
+
+1. Add your laptop as a peer, and add a machine on the target network (for example a home server) as another.
+2. In the home server's **Peer settings**, advertise its network, such as `192.168.1.0/24`, and use **Routes → Edit access** to choose who may use it.
+3. With the laptop's tunnel up, reach the network directly, for example `ssh user@192.168.1.20`.
+
+You can also jump through the server's public address with no VPN client on the laptop, because the server can reach every peer's tunnel address:
+
+```sh
+ssh -J ubuntu@vpn.example.com user@10.10.0.2
+```
+
+> [!TIP]
+> Harden the bastion itself: allow SSH with keys only, restrict its firewall, and put the dashboard behind HTTPS or limit port 3000 to trusted addresses.
 
 ## Screenshots
 

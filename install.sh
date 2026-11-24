@@ -86,9 +86,10 @@ is_hostname() {
 download() {
     local url=$1 out=$2
     if command -v curl >/dev/null; then
-        curl -fsSL -o "$out" "$url"
+        # Time out and retry instead of hanging on a stalled connection.
+        curl -fsSL --connect-timeout 15 --max-time 300 --retry 3 --retry-delay 3 -o "$out" "$url"
     elif command -v wget >/dev/null; then
-        wget -q -O "$out" "$url"
+        wget -q -T 30 -t 3 -O "$out" "$url"
     else
         die "curl or wget is required to download PortBridge. Install one with: apt-get install -y curl"
     fi

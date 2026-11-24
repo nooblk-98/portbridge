@@ -5,6 +5,19 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.2.3] - 2026-11-24
+
+### Added
+
+- The README now says plainly that PortBridge is a self-hosted alternative to
+  Tailscale and Headscale (and lists similar VPN, mesh and tunnel tools), when to
+  choose it, and how to use the server as a bastion (jump) host.
+
+### Fixed
+
+- `install.sh` no longer hangs when a download stalls. Downloads now time out
+  and retry, for both `curl` and `wget`.
+
 ## [1.2.2] - 2026-11-24
 
 ### Changed
@@ -138,6 +151,7 @@ First release of the Rust version of PortBridge: a WireGuard server with a web
 dashboard, per-peer routes with access rules, and public TCP and UDP port
 forwarding.
 
+[1.2.3]: https://github.com/nooblk-98/portbridge/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/nooblk-98/portbridge/compare/v1.2.0...v1.2.2
 [1.2.0]: https://github.com/nooblk-98/portbridge/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/nooblk-98/portbridge/compare/v1.0.0...v1.1.0
