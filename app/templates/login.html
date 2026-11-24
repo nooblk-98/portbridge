@@ -4,6 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
     <title>Login - Port Bridge</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/logo.svg') }}">
     <!-- Fonts -->
@@ -40,9 +42,11 @@
                     x-text="error"></div>
 
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Password</label>
+                    <label for="current-password"
+                        class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Password</label>
                     <div class="relative">
-                        <input type="password" x-model="password" required
+                        <input type="password" id="current-password" name="password" autocomplete="current-password"
+                            enterkeyhint="go" x-model="password" required
                             class="w-full rounded-xl border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-slate-900 dark:text-white focus:ring-primary-500 focus:border-primary-500 pl-4 py-3"
                             placeholder="Enter admin password">
                     </div>

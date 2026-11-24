@@ -3,7 +3,7 @@ function app() {
     return {
         currentTab: 'dashboard',
         mobileMenuOpen: false,
-        isDarkMode: localStorage.getItem('theme') === 'dark',
+        isDarkMode: window.PortBridgeTheme.isDark(),
         state: {},
         clients: [],
         forwardings: [],
@@ -66,17 +66,12 @@ function app() {
             this.loadData();
             setInterval(() => this.loadData(), 30000);
 
-            this.$watch('isDarkMode', val => {
-                localStorage.setItem('theme', val ? 'dark' : 'light');
-                if (val) document.documentElement.classList.add('dark');
-                else document.documentElement.classList.remove('dark');
-            });
-
-            if (this.isDarkMode) document.documentElement.classList.add('dark');
+            // theme.js owns the stored choice and the <html> class; follow it.
+            window.PortBridgeTheme.subscribe(dark => { this.isDarkMode = dark; });
         },
 
         toggleTheme() {
-            this.isDarkMode = !this.isDarkMode;
+            window.PortBridgeTheme.toggle();
         },
 
         async logout() {
@@ -252,7 +247,7 @@ function app() {
          * the update deterministic, including for the 30-second refresh.
          */
         buildRouteView() {
-            const rows = [...this.routes].sort((a, b) =>
+            const rows = this.routes.toSorted((a, b) =>
                 String(a.cidr).localeCompare(String(b.cidr), undefined, { numeric: true })
             );
             this.routeRows = rows.map(row => {

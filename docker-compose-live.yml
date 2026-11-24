@@ -8,7 +8,7 @@ services:
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
     ports:
       - "51820:51820/udp" # WireGuard
-      - "127.0.0.1:3000:3000/tcp" # Dashboard
+      - "3000:3000/tcp" # Dashboard
     cap_add:
       - NET_ADMIN
       - SYS_MODULE

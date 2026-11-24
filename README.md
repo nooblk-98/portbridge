@@ -15,7 +15,7 @@ PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptabl
 - **Private access**: share a host or subnet with other peers over WireGuard, with per-route access control.
 - **Public forwarding**: publish a TCP or UDP port on the server and send it to a service on a peer, with optional source IP restrictions.
 - **Easy onboarding**: create peers in the UI, then download the config or scan a QR code.
-- **Safe dashboard defaults**: the dashboard listens on localhost, passwords are stored as salted hashes, and peers can only reach each other through routes you approve.
+- **Safe defaults**: passwords are stored as salted hashes, logins are rate limited, and peers can only reach each other through routes you approve.
 
 ## Quick start
 
@@ -39,14 +39,10 @@ docker compose -f docker-compose-live.yml up -d
 To build from a local checkout instead, run `docker compose up -d --build`.
 
 
-> [!NOTE]
-> The dashboard is bound to `127.0.0.1:3000` on the server. Reach it from your computer with an SSH tunnel:
->
-> ```sh
-> ssh -N -L 3000:127.0.0.1:3000 user@vpn.example.com
-> ```
->
-> Then open <http://localhost:3000>.
+The dashboard is then available at `http://vpn.example.com:3000`. Allow TCP 3000 through your server and provider firewalls.
+
+> [!WARNING]
+> The dashboard is served over plain HTTP, so your password is sent unencrypted. Put it behind an HTTPS reverse proxy, restrict port 3000 to trusted addresses in your firewall, or bind it to localhost (`APP_HOST=127.0.0.1`, or `"127.0.0.1:3000:3000/tcp"` in Compose) and use an SSH tunnel: `ssh -N -L 3000:127.0.0.1:3000 user@vpn.example.com`.
 
 ### Debian or Ubuntu (no Docker)
 
@@ -64,7 +60,7 @@ wget -qO- https://raw.githubusercontent.com/nooblk-98/portbridge/main/install.sh
 
 To pin a version, set `PORTBRIDGE_VERSION` on the `sudo` side, for example `| sudo PORTBRIDGE_VERSION=v1.0.0 bash -s -- vpn.example.com`.
 
-The installer prompts for a dashboard password (16–128 letters or numbers) and stores only a salted hash of it. It creates the `pb0` WireGuard interface, stores data in `/var/lib/portbridge`, and starts the `portbridge` service. Use the SSH tunnel above to reach the dashboard.
+The installer prompts for a dashboard password (16–128 letters or numbers) and stores only a salted hash of it. It creates the `pb0` WireGuard interface, stores data in `/var/lib/portbridge`, and starts the `portbridge` service. The dashboard listens on port 3000 (allow TCP 3000 in your firewall). See the warning above about HTTP.
 
 ```sh
 sudo systemctl status portbridge

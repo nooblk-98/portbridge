@@ -72,3 +72,4 @@ jobs:
           node --check app/static/js/app.js
           node --check app/static/js/login.js
           node --check app/static/js/route-access.js
+          node --check app/static/js/theme.js

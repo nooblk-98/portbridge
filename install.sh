@@ -233,12 +233,17 @@ if [[ $mode == upgrade ]]; then
     exit 0
 fi
 
-# Read from the terminal so the prompt also works when the script is piped in.
-if ! read -rsp "Dashboard password (at least 16 letters or numbers): " password </dev/tty; then
+# Unattended installs can supply PORTBRIDGE_ADMIN_PASSWORD. Otherwise read from
+# the terminal so the prompt also works when the script is piped in.
+if [[ -n ${PORTBRIDGE_ADMIN_PASSWORD:-} ]]; then
+    password=$PORTBRIDGE_ADMIN_PASSWORD
+else
+    if ! read -rsp "Dashboard password (at least 16 letters or numbers): " password </dev/tty; then
+        echo
+        die "The dashboard password prompt needs an interactive terminal."
+    fi
     echo
-    die "The dashboard password prompt needs an interactive terminal."
 fi
-echo
 if [[ ! $password =~ ^[A-Za-z0-9]{16,128}$ ]]; then
     die "Choose a password of 16 to 128 letters or numbers."
 fi
@@ -272,7 +277,7 @@ DATA_DIR=$state_dir
 $password_setting
 SEED_FORWARDING=0
 ENABLE_IPV4_FORWARDING=1
-APP_HOST=127.0.0.1
+APP_HOST=0.0.0.0
 APP_PORT=3000
 ENV
 
@@ -280,4 +285,5 @@ write_unit
 systemctl daemon-reload
 systemctl enable --now portbridge.service
 systemctl is-active --quiet portbridge.service
-echo "PortBridge is running on 127.0.0.1:3000. Allow UDP 51820 in your server firewall."
+echo "PortBridge is running. Allow UDP 51820 (WireGuard) and TCP 3000 (dashboard) in your server firewall."
+echo "The dashboard is served over plain HTTP at http://$endpoint:3000; put it behind HTTPS before exposing it widely."

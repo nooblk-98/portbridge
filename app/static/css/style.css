@@ -13,31 +13,58 @@
     background: rgba(30, 41, 59, 0.7);
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+/* Colour scheme: follow the system unless theme.js pins one through the
+   <meta name="color-scheme"> element. Native UI (scrollbars, form controls)
+   keys off this property. */
+:root {
+    color-scheme: light dark;
 }
 
-::-webkit-scrollbar-track {
-    background: transparent;
+:root:has(> head > meta[name="color-scheme"][content="dark"]) {
+    color-scheme: dark;
 }
 
-::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 4px;
+:root:has(> head > meta[name="color-scheme"][content="light"]) {
+    color-scheme: light;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-    background: #475569;
+/* Custom Scrollbar: thumbs keep at least 3:1 contrast with the page. */
+:root {
+    --scrollbar-thumb: #7c8ba1;
+    --scrollbar-thumb-hover: #64748b;
+    --scrollbar-track: transparent;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    scrollbar-width: thin;
 }
 
-::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+:root.dark {
+    --scrollbar-thumb: #64748b;
+    --scrollbar-thumb-hover: #94a3b8;
 }
 
-.dark ::-webkit-scrollbar-thumb:hover {
-    background: #64748b;
+/* Browsers without the standard properties fall back to WebKit pseudo-elements. */
+@supports not (scrollbar-color: auto) {
+    :root {
+        scrollbar-width: auto;
+    }
+
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--scrollbar-track);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--scrollbar-thumb);
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--scrollbar-thumb-hover);
+    }
 }
 
 /* ------------------------------------------------------------------
