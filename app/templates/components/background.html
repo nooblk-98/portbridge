@@ -1,0 +1,26 @@
+{#
+  Falling stars behind the page: pure CSS, no scripts. Every position, length and
+  delay comes from the loop number, so the sky is the same on every load. The
+  keyframes live in tailwind.config.js, and dark: variants follow the theme.
+  Streaks are transform and opacity animations, which run on the compositor, so
+  they cost almost nothing. People who prefer reduced motion get still stars.
+#}
+<div aria-hidden="true" data-testid="background"
+    class="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[radial-gradient(ellipse_at_bottom,#dbe4ff_0%,#f8fafc_72%)] dark:bg-[radial-gradient(ellipse_at_bottom,#1e1b4b_0%,#05060d_78%)]">
+
+    {# Stars that stay put and twinkle. #}
+    {% for i in range(0, 56) %}
+    <span class="absolute rounded-full bg-indigo-400 dark:bg-white animate-twinkle motion-reduce:animate-none"
+        style="left: {{ (i * 37 + 11) % 100 }}%; top: {{ (i * 53 + 7) % 100 }}%; width: {{ 2 if i % 4 == 0 else 1 }}px; height: {{ 2 if i % 4 == 0 else 1 }}px; animation-duration: {{ 3 + i % 4 }}s; animation-delay: -{{ (i * 7) % 40 / 10 }}s;"></span>
+    {% endfor %}
+
+    {# Stars that fall. The outer box sets the angle, so the star moves along it. #}
+    {% for i in range(0, 22) %}
+    {% set cycle = 9 + (i * 5) % 8 %}
+    <div class="absolute rotate-[145deg] motion-reduce:hidden"
+        style="left: {{ (i * 41 + 17) % 125 - 10 }}%; top: {{ (i * 29) % 60 - 25 }}%;">
+        <span class="relative block h-px w-[var(--len)] animate-shooting-star bg-gradient-to-r from-transparent to-indigo-500/80 after:absolute after:right-0 after:top-1/2 after:h-[3px] after:w-[3px] after:-translate-y-1/2 after:rounded-full after:bg-indigo-500 after:shadow-[0_0_8px_2px_rgba(99,102,241,0.55)] after:content-[''] dark:to-sky-100 dark:after:bg-white dark:after:shadow-[0_0_8px_2px_rgba(186,230,253,0.8)]"
+            style="--len: {{ 90 + (i * 23) % 110 }}px; animation-duration: {{ cycle }}s; animation-delay: -{{ (i * 3) % cycle }}s;"></span>
+    </div>
+    {% endfor %}
+</div>

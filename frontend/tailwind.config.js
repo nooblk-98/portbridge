@@ -70,8 +70,22 @@ module.exports = {
       animation: {
         "fade-in": "fadeIn 0.3s ease-out",
         "slide-up": "slideUp 0.4s ease-out",
+        // Per-star timing is set inline; these are the defaults.
+        "shooting-star": "shootingStar 12s linear infinite",
+        twinkle: "twinkle 4s ease-in-out infinite",
       },
       keyframes: {
+        // A star streaks along its own axis, then rests until the next cycle.
+        shootingStar: {
+          "0%": { transform: "translateX(0)", opacity: "0" },
+          "2%": { opacity: "1" },
+          "22%": { opacity: "0.9" },
+          "30%, 100%": { transform: "translateX(var(--travel, 75vmax))", opacity: "0" },
+        },
+        twinkle: {
+          "0%, 100%": { opacity: "0.2" },
+          "50%": { opacity: "1" },
+        },
         fadeIn: {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },

@@ -32,6 +32,8 @@
     class="bg-gray-50 text-slate-800 dark:bg-dark-bg dark:text-slate-200 font-sans antialiased transition-colors duration-300"
     x-data="app()" x-init="initApp()" :class="{ 'dark': isDarkMode }">
 
+    {% include "components/background.html" %}
+
     {% block content %}
     {% endblock %}
 
