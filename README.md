@@ -11,12 +11,25 @@
 
 PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptables port forwarding, managed from a web dashboard. Run it on a public VPS to expose services from home labs, Starlink or other connections that cannot accept inbound traffic. Think of it as a **self-hosted alternative to Tailscale and Headscale**, with public port forwarding built in, that also works as a **bastion (jump) host**.
 
-- **Private access**: share a host or subnet with other peers over WireGuard, with per-route access control.
-- **Public forwarding**: publish a TCP or UDP port on the server and send it to a service on a peer, with optional source IP restrictions.
+- **Private access**: reach services on other peers over WireGuard without exposing them to the internet, with per-route access control.
+- **Public forwarding, only when you want it**: publish a TCP or UDP port on the server and send it to a service on a peer, from the same dashboard, with optional source IP restrictions.
 - **Live dashboard**: peers online, traffic over time, top talkers, connection health checks, and CPU, memory and disk gauges.
 - **Easy onboarding**: create peers in the UI, then download the config or scan a QR code. Each peer gets its own cartoon avatar.
 - **Split tunnel by default**: devices keep their own internet connection and IP. Switch a peer to full tunnel from its card when you want its traffic to leave through the server.
 - **Safe defaults**: passwords are stored as salted hashes, logins are rate limited, and peers can only reach each other through routes you approve.
+
+## Private by default, public when you choose
+
+Nothing a peer runs is reachable from the internet unless you decide it should be. You have two ways to reach a service, and both are managed from the dashboard:
+
+| | Private access (WireGuard peers) | Public forwarding |
+| --- | --- | --- |
+| **Who can connect** | Only devices you added as peers, and only to routes you approve | Anyone on the internet, or only the source IPs you allow |
+| **Exposed to the internet** | No. The service stays on the private tunnel network | Yes, on the public port you choose |
+| **How to set it up** | Add a peer, then use **Clients → Peer settings** and **Routes** to share a host or subnet | **Forwarding**: pick a public port, a target peer and a service port |
+| **Good for** | SSH, admin panels, databases, NAS, anything you do not want public | Web servers, game servers, anything strangers must reach |
+
+Use private access for everything you can, and add a forwarding rule only for the few services that must be public. Both live in the same panel, so you can switch a service from private to public, and back, without touching a firewall by hand.
 
 ## Where PortBridge fits
 
@@ -171,7 +184,9 @@ sudo PORTBRIDGE_BINARY="$PWD/target/release/portbridge" bash install.sh vpn.exam
 1. Open **Clients → Peer settings** for the device that owns or can reach the host.
 2. Enter an IPv4 address (`192.168.50.10`) or CIDR (`192.168.50.0/24`) and save.
 3. If the destination sits behind that device, enable IP forwarding on it, allow forwarding in its firewall, and add a return route to the WireGuard subnet (or use source NAT).
-4. Peers using **Split tunnel** must re-import their updated profile. They can then connect to the destination IP directly.
+4. Peers using **Split tunnel** must re-import their updated profile. The dashboard shows a banner listing those peers with an **Imported** button, so you can track which devices still need it. They can then connect to the destination IP directly.
+
+The service is **not** exposed to the internet: only peers you allow can reach it, through the tunnel.
 
 You can advertise private IPv4 ranges and `100.64.0.0/10`. Routes must be distinct and cannot overlap the VPN subnet or existing server routes. DNS, MTU and keepalive can also be set per peer.
 
@@ -179,7 +194,7 @@ Open **Routes** and select **Edit access** to choose which peers may use a route
 
 ### Publish a service to the internet
 
-Open **Forwarding**, create a rule, and choose a public port, protocol, target peer and service port. Optionally restrict it to a source IP or CIDR.
+Private access is enough for most services. Publish one on the internet only when people outside your VPN must reach it. Open **Forwarding**, create a rule, and choose a public port, protocol, target peer and service port. Optionally restrict it to a source IP or CIDR.
 
 The service sees the original client address, so its replies must return through WireGuard. With a split-tunnel profile, add a return route for the permitted sources, or use a full-tunnel profile. Allow the public port through your firewalls, and for Docker add the port to the Compose `ports` list, for example `"30000:30000/tcp"`.
 
