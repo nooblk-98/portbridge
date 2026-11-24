@@ -5,6 +5,16 @@ All notable changes to PortBridge are listed here. The format follows
 [Semantic Versioning](https://semver.org/). Each release on GitHub carries the
 notes for its version.
 
+## [1.6.2] - 2026-11-24
+
+### Fixed
+
+- **The traffic chart no longer disappears when you switch between dark and light
+  mode.** It stayed blank until the page was reloaded. The theme switch used to
+  destroy the chart and build a new one, and Chart.js puts the canvas back the way
+  it found it on destroy, which left it hidden. The chart is now recoloured in
+  place, so it stays drawn.
+
 ## [1.6.1] - 2026-11-24
 
 ### Changed

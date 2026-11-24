@@ -1,6 +1,6 @@
 // @ts-check
 const { test, expect } = require("./fixtures");
-const { openPage } = require("./helpers");
+const { openPage, isMobile } = require("./helpers");
 
 test.describe("dashboard", () => {
   test.beforeEach(async ({ page }) => {
@@ -65,6 +65,45 @@ test.describe("dashboard", () => {
     const canvasSize = await panel.locator("canvas").evaluate(node => [node.width, node.height]);
     expect(canvasSize[0]).toBeGreaterThan(100);
     expect(canvasSize[1]).toBeGreaterThan(50);
+  });
+
+  test("the chart stays drawn, in the right colours, when the theme is switched", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await openPage(page, "/", "Dashboard");
+    const canvas = page.getByRole("img", { name: /traffic over the selected period/ });
+    await expect(canvas).toBeVisible();
+
+    /** What the chart looks like right now: visible, sized, painted, and its axis colour. */
+    const chart = () =>
+      canvas.evaluate(node => {
+        const box = node.getBoundingClientRect();
+        const data = /** @type {CanvasRenderingContext2D} */ (node.getContext("2d")).getImageData(0, 0, node.width, node.height).data;
+        let painted = 0;
+        for (let index = 3; index < data.length; index += 4) if (data[index]) painted += 1;
+        // @ts-ignore Chart is the Chart.js global.
+        const drawing = window.Chart.getChart(node);
+        return {
+          shown: getComputedStyle(node).display !== "none" && box.width > 100 && box.height > 50,
+          painted: painted > 1000,
+          axis: drawing.options.scales.x.ticks.color,
+        };
+      });
+
+    const switchTheme = async label => {
+      if (isMobile(page)) {
+        await page.getByRole("button", { name: "Open navigation menu" }).click();
+        await page.locator("#mobile-menu").getByRole("button", { name: label }).click();
+        await page.mouse.click(370, 400);
+      } else {
+        await page.locator("aside").getByRole("button", { name: label }).click();
+      }
+    };
+
+    expect(await chart()).toEqual({ shown: true, painted: true, axis: "#64748b" });
+    await switchTheme("Dark Mode");
+    await expect.poll(chart).toEqual({ shown: true, painted: true, axis: "#94a3b8" });
+    await switchTheme("Light Mode");
+    await expect.poll(chart).toEqual({ shown: true, painted: true, axis: "#64748b" });
   });
 
   test("ranks the busiest peers", async ({ page }) => {
