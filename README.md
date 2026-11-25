@@ -1,6 +1,7 @@
 <div align="center">
   <img src="images/banner.png" alt="PortBridge: reach devices behind NAT or CGNAT through a WireGuard server you control" width="100%">
 
+  [![Live demo](https://img.shields.io/badge/live-demo-0ea5e9?style=flat-square&logo=cloudflarepages&logoColor=white)](https://portbridge-demo.pages.dev)
   [![Release](https://img.shields.io/github/v/release/nooblk-98/portbridge?style=flat-square&logo=github&color=0ea5e9)](https://github.com/nooblk-98/portbridge/releases)
   [![Build](https://github.com/nooblk-98/portbridge/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/nooblk-98/portbridge/actions/workflows/release.yml)
   [![Docker pulls](https://img.shields.io/docker/pulls/lahiru98s/portbridge?style=flat-square&logo=docker&logoColor=white&color=2496ed)](https://hub.docker.com/r/lahiru98s/portbridge)
@@ -10,6 +11,8 @@
 </div>
 
 PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptables port forwarding, managed from a web dashboard. Run it on a public VPS to expose services from home labs, Starlink or other connections that cannot accept inbound traffic. Think of it as a **self-hosted alternative to Tailscale and Headscale**, with public port forwarding built in, that also works as a **bastion (jump) host**.
+
+**Try it now:** the [live demo](https://portbridge-demo.pages.dev) runs the real dashboard with sample data. Any password works, and nothing is saved.
 
 **Jump to:** [Features](#features-and-capabilities) · [Install](#install) · [Update](#update) · [Uninstall](#uninstall) · [Usage](#usage) · [Configuration](#configuration) · [Backup and restore](#backup-and-restore) · [Contributing](#contributing)
 
