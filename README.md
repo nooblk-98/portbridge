@@ -96,15 +96,14 @@ docker compose -f docker-compose-live.yml logs -f
 
 The dashboard is at `http://vpn.example.com:3000`. The image is published for `amd64` and `arm64` on [Docker Hub](https://hub.docker.com/r/lahiru98s/portbridge) and GHCR. The file uses the `latest` tag; to stay on one release, change it to a version tag such as `lahiru98s/portbridge:v1.6.2`. To store a hash instead of the password, set `ADMIN_PASSWORD_HASH` (see [Configuration](#configuration)).
 
-### Install the normal way (Debian or Ubuntu, no Docker)
+### Install ( Debian or Ubuntu, no Docker )
 
-Needs systemd and sudo. The installer downloads the latest release for your architecture (`x86_64` or `arm64`), verifies its SHA-256 checksum, asks for a dashboard password (16 to 128 letters or numbers, stored only as a salted hash), creates the `pb0` WireGuard interface, keeps its data in `/var/lib/portbridge`, and starts the `portbridge` service. No Rust toolchain is needed.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/nooblk-98/portbridge/main/install.sh | sudo bash -s -- vpn.example.com
 ```
 
-With `wget` instead of `curl`:
+or
 
 ```sh
 wget -qO- https://raw.githubusercontent.com/nooblk-98/portbridge/main/install.sh | sudo bash -s -- vpn.example.com
@@ -140,7 +139,6 @@ To build and run it in Docker instead, run `docker compose up -d --build` in the
 
 ## Update
 
-When a newer release is out, the dashboard shows what changed and the command below, with **Remind me later** and **Ignore this version**. Your browser asks GitHub's public releases API and sends nothing about your installation, and the server never upgrades itself. Set `UPDATE_CHECK=0` to turn the notice off. See [CHANGELOG.md](CHANGELOG.md) for each release's changes.
 
 **Docker.** Run these in the folder with your Compose file. Your peers and keys stay in the `wg-data` volume:
 
@@ -157,7 +155,6 @@ If you pinned a version tag, change it to the new one first.
 curl -fsSL https://raw.githubusercontent.com/nooblk-98/portbridge/main/install.sh | sudo bash -s -- --upgrade
 ```
 
-If a reverse proxy caches your dashboard's files, hard-refresh the page once after upgrading (Ctrl+Shift+R). If you are upgrading from the earlier Python version, sign in again and recreate legacy public forwards for the intended peers.
 
 ## Uninstall
 
@@ -168,7 +165,7 @@ docker compose -f docker-compose-live.yml down        # remove PortBridge, keep 
 docker compose -f docker-compose-live.yml down -v     # also delete the data volume (peers and keys)
 ```
 
-**Normal install.** The same script with `--uninstall`. It removes the service, the program and its settings in `/etc/portbridge`. Your peers and keys stay in `/var/lib/portbridge` unless you add `--purge`:
+The same script with `--uninstall`. It removes the service, the program and its settings in `/etc/portbridge`. Your peers and keys stay in `/var/lib/portbridge` unless you add `--purge`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/nooblk-98/portbridge/main/install.sh | sudo bash -s -- --uninstall
@@ -201,27 +198,6 @@ The per-peer **Server access** switch lets Docker containers and other traffic f
 
 Peers use split tunneling by default, so a device keeps its own internet connection and public IP. To send all of a device's traffic through the server, turn off **Split tunnel** in that peer's settings and re-import its profile. To forbid this for everyone, set `ALLOW_INTERNET_EGRESS=0`.
 
-### Use it as a bastion host
-
-Every peer can reach the server, and any peer can share a subnet, so the VPS also works as a **bastion (jump) host** for machines that have no public address.
-
-1. Add your laptop as a peer, and add a machine on the target network (for example a home server) as another.
-2. In the home server's **Peer settings**, advertise its network, such as `192.168.1.0/24`, and use **Routes → Edit access** to choose who may use it.
-3. With the laptop's tunnel up, reach the network directly, for example `ssh user@192.168.1.20`.
-
-You can also jump through the server's public address with no VPN client on the laptop, because the server can reach every peer's tunnel address:
-
-```sh
-ssh -J ubuntu@vpn.example.com user@10.10.0.2
-```
-
-You can also jump through the server's public address with no VPN client, because the server can reach every peer's tunnel address:
-
-```sh
-ssh -J ubuntu@vpn.example.com user@10.10.0.2
-```
-
-Harden the bastion itself: allow SSH with keys only, restrict its firewall, and put the dashboard behind HTTPS.
 
 ## Configuration
 
