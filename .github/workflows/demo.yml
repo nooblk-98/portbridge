@@ -1,0 +1,57 @@
+name: Demo
+
+# Builds the live demo (the real dashboard as static files with sample data) and
+# deploys it to Cloudflare Pages. The Release workflow calls this after each
+# release; it can also be run by hand from the Actions tab.
+#
+# Needs two repository secrets: CLOUDFLARE_API_TOKEN (Pages: Edit) and
+# CLOUDFLARE_ACCOUNT_ID. The Pages project is created on the first run.
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Version to show in the demo (for example 1.6.3)"
+        type: string
+        default: ""
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo
+  cancel-in-progress: true
+
+env:
+  PROJECT: portbridge-demo
+
+jobs:
+  deploy:
+    name: Build and deploy the demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Install tooling
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+      - name: Build the demo
+        working-directory: frontend
+        env:
+          DEMO_VERSION: ${{ inputs.version }}
+        run: npm run build:demo
+      - name: Deploy to Cloudflare Pages
+        working-directory: frontend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4.45.0 pages project create "$PROJECT" --production-branch main || true
+          npx --yes wrangler@4.45.0 pages deploy demo/dist --project-name "$PROJECT" --branch main --commit-message "Demo ${{ inputs.version || github.sha }}" --commit-dirty=true
