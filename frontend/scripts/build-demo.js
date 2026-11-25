@@ -47,7 +47,7 @@ function write(file, content) {
 }
 
 async function main() {
-  const version = latestVersion();
+  const version = (process.env.DEMO_VERSION || "").replace(/^v/, "") || latestVersion();
   const stop = await startServer(PORT);
   try {
     fs.rmSync(OUT, { recursive: true, force: true });

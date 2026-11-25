@@ -105,7 +105,8 @@ involved. Edits last for the browser tab.
 Try it locally: `npm run build:demo && npm run serve:demo`, then open
 http://127.0.0.1:43292.
 
-To host it on Cloudflare Pages, connect the repository, choose the **`demo`**
-branch (the Demo workflow rebuilds and publishes it on every change to the
-dashboard), leave the build command empty and set the output directory to `/`.
-If you add an API route to the server, add the same answer to `demo.js`.
+It deploys to Cloudflare Pages (project `portbridge-demo`) from the Demo workflow,
+which the Release workflow runs after every release and which can be run by hand
+from the Actions tab. It needs the repository secrets `CLOUDFLARE_API_TOKEN` (a
+token with Pages: Edit) and `CLOUDFLARE_ACCOUNT_ID`. If you add an API route to
+the server, add the same answer to `demo.js`.

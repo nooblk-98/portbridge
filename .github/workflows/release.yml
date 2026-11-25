@@ -106,6 +106,19 @@ jobs:
     with:
       tag: ${{ needs.tag.outputs.new_tag }}
 
+  demo:
+    name: Deploy the live demo
+    needs: tag
+    if: needs.tag.outputs.new_tag != ''
+    permissions:
+      contents: read
+    uses: ./.github/workflows/demo.yml
+    with:
+      version: ${{ needs.tag.outputs.new_tag }}
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
   publish:
     name: Publish release
     needs: [tag, binaries]
