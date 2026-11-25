@@ -1,0 +1,51 @@
+name: Demo
+
+# Publishes the live demo (static files, sample data) to the `demo` branch, which
+# Cloudflare Pages serves with no build step of its own. See frontend/README.md.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "frontend/demo/**"
+      - "frontend/scripts/**"
+      - "examples/e2e_server.rs"
+      - "CHANGELOG.md"
+      - ".github/workflows/demo.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: demo
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Build and publish the demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Install tooling
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+      - name: Build the demo
+        working-directory: frontend
+        run: npm run build:demo
+      - name: Publish to the demo branch
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE: ${{ github.sha }}
+        run: |
+          cd frontend/demo/dist
+          git init --quiet --initial-branch=demo
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit --quiet -m "Demo built from ${SOURCE}"
+          git push --force "https://x-access-token:${TOKEN}@github.com/${REPOSITORY}.git" demo

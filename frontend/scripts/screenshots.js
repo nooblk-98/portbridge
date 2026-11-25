@@ -7,12 +7,12 @@
 // Needs the browser from `npx playwright install chromium` and a Rust toolchain.
 // The pages are 1600 CSS pixels wide, saved at 2000 pixels (1.25x), as full
 // pages: the window is resized to fit each page's content, so nothing scrolls.
-const { spawn, execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("@playwright/test");
 
-const ROOT = path.join(__dirname, "../..");
+const { ROOT, PASSWORD, startServer } = require("./lib/server");
+
 const OUT = path.join(ROOT, "images/screenshots");
 const PORT = process.env.E2E_PORT || "43290";
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -23,26 +23,6 @@ const SCALE = 2000 / WIDTH;
 function latestVersion() {
   const text = fs.readFileSync(path.join(ROOT, "CHANGELOG.md"), "utf8");
   return /^## \[(\d+\.\d+\.\d+)\]/m.exec(text)?.[1] ?? "1.0.0";
-}
-
-/** Start the demo server and wait until it answers. Returns a function that stops it. */
-async function startServer() {
-  execFileSync("cargo", ["build", "--quiet", "--example", "e2e_server"], { cwd: ROOT, stdio: "inherit" });
-  const server = spawn(path.join(ROOT, "target/debug/examples/e2e_server"), [], {
-    cwd: ROOT,
-    env: { ...process.env, E2E_PORT: PORT },
-    stdio: "ignore",
-  });
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    try {
-      if ((await fetch(`${BASE}/login`)).ok) return () => server.kill();
-    } catch {
-      // Not listening yet.
-    }
-    await new Promise(resolve => setTimeout(resolve, 200));
-  }
-  server.kill();
-  throw new Error("The demo server did not start.");
 }
 
 /** Resize the window so the whole page fits with no scrolling, then let the layout settle. */
@@ -63,7 +43,7 @@ async function fitToContent(page, contentSelector, extra = 0) {
 
 async function main() {
   const version = latestVersion();
-  const stop = await startServer();
+  const stop = await startServer(PORT);
   const browser = await chromium.launch({ channel: "chromium" });
   try {
     for (const scheme of ["light", "dark"]) {
@@ -87,7 +67,7 @@ async function main() {
         }),
       );
       await page.goto(`${BASE}/login`);
-      await page.getByPlaceholder("Enter admin password").fill("e2e-password");
+      await page.getByPlaceholder("Enter admin password").fill(PASSWORD);
       await page.getByRole("button", { name: "Sign In" }).click();
       await page.waitForURL(`${BASE}/`);
 

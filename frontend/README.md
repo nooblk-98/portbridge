@@ -92,3 +92,20 @@ It builds the demo server, opens each page at 1600 pixels wide, resizes the wind
 to fit the whole page, and writes the six images at 2000 pixels wide. The footer
 shows the newest version in `CHANGELOG.md` rather than the development build's
 `0.0.0-dev`.
+
+## Live demo
+
+`npm run build:demo` writes the real dashboard as static files to
+`frontend/demo/dist/` (git-ignored), for Cloudflare Pages or any static host. The
+pages are rendered once by the fixture server (`examples/e2e_server.rs`), and
+`frontend/demo/demo.js` replaces `fetch` in the browser so the dashboard talks to
+sample data instead of a server. Nothing is sent anywhere, and no WireGuard is
+involved. Edits last for the browser tab.
+
+Try it locally: `npm run build:demo && npm run serve:demo`, then open
+http://127.0.0.1:43292.
+
+To host it on Cloudflare Pages, connect the repository, choose the **`demo`**
+branch (the Demo workflow rebuilds and publishes it on every change to the
+dashboard), leave the build command empty and set the output directory to `/`.
+If you add an API route to the server, add the same answer to `demo.js`.
