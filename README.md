@@ -20,7 +20,6 @@ PortBridge is a single Rust binary that pairs a WireGuard VPN server with iptabl
 - Create, rename and delete WireGuard peers from the dashboard. Each peer gets its own key pair and the next free tunnel address, or one you choose.
 - Give a device its profile as a `.conf` download or a QR code for the WireGuard app. Downloads are never cached.
 - Per-peer settings: DNS servers, MTU (1280 to 9000), keepalive (25 seconds by default, 0 turns it off), and split or full tunnel.
-- Each peer gets a generated cartoon avatar that survives a rename.
 - Tracks which devices still need to import an updated profile, with a banner and a one-click **Imported** confirmation.
 
 **Private networking**
