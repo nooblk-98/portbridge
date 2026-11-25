@@ -498,24 +498,25 @@
         const note = document.createElement('div');
         note.setAttribute('data-testid', 'demo-note');
         note.style.cssText = [
-            'position:fixed', 'left:50%', 'bottom:12px', 'transform:translateX(-50%)', 'z-index:2147483000',
-            'display:flex', 'align-items:center', 'gap:10px', 'max-width:calc(100vw - 24px)', 'padding:8px 14px',
-            'border-radius:999px', 'background:rgba(15,23,42,0.92)', 'color:#f8fafc', 'font:500 13px/1.3 Inter,system-ui,sans-serif',
+            'position:fixed', 'left:12px', 'right:12px', 'bottom:12px', 'margin:0 auto', 'width:fit-content', 'z-index:2147483000',
+            'box-sizing:border-box', 'display:flex', 'align-items:center', 'justify-content:center', 'gap:10px',
+            'max-width:calc(100vw - 24px)', 'padding:8px 14px', 'border-radius:16px', 'background:rgba(15,23,42,0.92)', 'color:#f8fafc', 'font:500 13px/1.3 Inter,system-ui,sans-serif',
             'box-shadow:0 6px 24px rgba(0,0,0,0.3)', 'backdrop-filter:blur(6px)',
         ].join(';');
         const text = document.createElement('span');
         text.textContent = 'Live demo with sample data. Changes stay in this tab.';
+        text.style.cssText = 'min-width:0';
         const link = document.createElement('a');
         link.href = REPOSITORY_URL;
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         link.textContent = 'Get PortBridge';
-        link.style.cssText = 'color:#7dd3fc;font-weight:600;text-decoration:underline;white-space:nowrap';
+        link.style.cssText = 'color:#7dd3fc;font-weight:600;text-decoration:underline;white-space:nowrap;flex:none';
         const close = document.createElement('button');
         close.type = 'button';
         close.setAttribute('aria-label', 'Hide demo note');
         close.textContent = '×';
-        close.style.cssText = 'background:none;border:0;color:#cbd5e1;font-size:18px;line-height:1;cursor:pointer;padding:0 2px';
+        close.style.cssText = 'background:none;border:0;color:#cbd5e1;font-size:18px;line-height:1;cursor:pointer;padding:0 2px;flex:none';
         close.addEventListener('click', () => note.remove());
         note.append(text, link, close);
         document.body.append(note);
